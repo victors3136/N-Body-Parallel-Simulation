@@ -1,121 +1,60 @@
+import data.*;
+
 import java.io.*;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class LocallyThreadedNBodyCalculator {
-    // Constants
-    private static final int DEFAULT_N = 10000;   // Number of particles
-    private static final int DEFAULT_TIME = 1000; // Number of iterations
-    private static final double G = 6.67300e-11;  // Gravitational constant
-    private static final double XBOUND = 1.0e6;   // Width of space
-    private static final double YBOUND = 1.0e6;   // Height of space
-    private static final double ZBOUND = 1.0e6;   // Depth of space
-    private static final double RBOUND = 10;      // Upper bound on radius
-    private static final double DELTAT = 0.01;    // Time increment
-    private static final double THETA = 1.0;      // Opening angle for BH
-
-    // Sample masses
-    private static final double MASS_OF_JUPITER = 1.899e27;
-    private static final double MASS_OF_EARTH = 5.974e24;
-    private static final double MASS_OF_MOON = 7.348e22;
-    private static final double MASS_OF_UNKNOWN = 1.899e12;
 
     // Thread-specific variables
-    private final int numThreads;
+    private final int threadCount;
     private final CyclicBarrier barrier;
     private final ExecutorService executor;
-    private final Thread[] workers;
     private final AtomicInteger activeWorkers;
 
-    // Instance variables
-    private Position[] position;   // Current positions for all particles
-    private Velocity[] velocity;   // Velocity of particles
-    private double[] mass;         // Mass of each particle
-    private double[] radius;       // Radius of each particle
-    private Force[] force;         // Force experienced by all particles
-    private Cell rootCell;         // Root of BH octtree
+    private List<Position> positions;
+    private List<Velocity> velocities;
+    private List<Mass> masses;
+    private List<Double> radiuses;
+    private List<Force> forces;
+    private Quadrant rootQuadrant;
 
-    private int N;               // Number of particles
-    private int TIME;           // Number of iterations
-    private int partSize;       // Number of particles each thread is responsible for
+    private final int partitionSize;
 
-    // Inner classes for data structures
-    static class Position {
-        double px, py, pz;
-    }
+    private final Random random = new Random();
 
-    static class Velocity {
-        double vx, vy, vz;
-    }
-
-    static class Force {
-        double fx, fy, fz;
-    }
-
-    static class Cell {
-        int index;
-        int noSubcells;
-        double mass;
-        double x, y, z;
-        double cx, cy, cz;
-        double width, height, depth;
-        Cell[] subcells;
-
-        Cell(double width, double height, double depth) {
-            this.mass = 0;
-            this.noSubcells = 0;
-            this.index = -1;
-            this.cx = 0;
-            this.cy = 0;
-            this.cz = 0;
-            this.width = width;
-            this.height = height;
-            this.depth = depth;
-            this.subcells = new Cell[8];
-        }
-    }
-
-    private Random random = new Random();
-
-    // Constructor
     public LocallyThreadedNBodyCalculator() {
-        // Use number of available processors for threads
-        this.numThreads = Runtime.getRuntime().availableProcessors();
-        this.barrier = new CyclicBarrier(numThreads);
-        this.executor = Executors.newFixedThreadPool(numThreads);
-        this.workers = new Thread[numThreads];
-        this.activeWorkers = new AtomicInteger(numThreads);
+        this.threadCount = Runtime.getRuntime().availableProcessors();
+        this.barrier = new CyclicBarrier(threadCount);
+        this.executor = Executors.newFixedThreadPool(threadCount);
+        this.activeWorkers = new AtomicInteger(threadCount);
 
-        // Hardcoded values
-        N = 1000;      // Number of particles
-        TIME = 500;    // Number of iterations
-
-        // Calculate partition size
-        partSize = N / numThreads;
+        partitionSize = CommonCore.bodyCount / threadCount;
 
         System.out.println("Initialization:");
-        System.out.println("N = " + N);
-        System.out.println("TIME = " + TIME);
-        System.out.println("Threads = " + numThreads);
-        System.out.println("Particles per thread = " + partSize);
+        System.out.println("Bodies Count = " + CommonCore.bodyCount);
+        System.out.println("Iteration Count = " + CommonCore.iterationCount);
+        System.out.println("Thread Count = " + threadCount);
+        System.out.println("Particles per thread = " + partitionSize);
 
         initializeArrays();
         initializeSpace();
     }
 
-    private void initializeArrays() {
-        mass = new double[N];
-        radius = new double[N];
-        position = new Position[N];
-        velocity = new Velocity[N];
-        force = new Force[N];
 
-        // Initialize all objects
-        for (int i = 0; i < N; i++) {
-            position[i] = new Position();
-            velocity[i] = new Velocity();
-            force[i] = new Force();
+    private void initializeArrays() {
+        masses = List.of(new Mass[CommonCore.bodyCount]);
+        radiuses = List.of(new Double[CommonCore.bodyCount]);
+        positions = List.of(new Position[CommonCore.bodyCount]);
+        velocities = List.of(new Velocity[CommonCore.bodyCount]);
+        forces = List.of(new Force[CommonCore.bodyCount]);
+
+        for (int i = 0; i < CommonCore.bodyCount; i++) {
+            positions.set(i, new Position(0, 0, 0));
+            velocities.set(i, new Velocity(0, 0, 0));
+            forces.set(i, new Force(0, 0, 0));
         }
     }
 
@@ -126,38 +65,34 @@ public class LocallyThreadedNBodyCalculator {
 
         Worker(int threadId) {
             this.threadId = threadId;
-            this.startIndex = threadId * partSize;
-            this.endIndex = startIndex + partSize;
+            this.startIndex = threadId * partitionSize;
+            this.endIndex = startIndex + partitionSize;
         }
 
         @Override
         public void run() {
             try {
-                for (int iter = 0; iter < TIME; iter++) {
-                    // Compute forces for this partition
-                    for (int i = startIndex; i < endIndex; i++) {
+                for (int iter = 0; iter < CommonCore.iterationCount; iter++) {
+                    for (var i = startIndex; i < endIndex; i++) {
                         computeForceForParticle(i);
                     }
                     barrier.await();
 
-                    // Update velocities and positions
-                    for (int i = startIndex; i < endIndex; i++) {
+                    for (var i = startIndex; i < endIndex; i++) {
                         updateVelocityAndPosition(i);
                     }
                     barrier.await();
 
-                    // Let thread 0 handle output
                     if (threadId == 0) {
                         writePositions(iter);
                         if ((iter + 1) % 50 == 0) {
-                            System.out.printf("Completed iteration %d of %d%n", iter + 1, TIME);
+                            System.out.printf("Completed iteration %d of %d%n", iter + 1, CommonCore.iterationCount);
                         }
                     }
                     barrier.await();
                 }
             } catch (Exception e) {
                 System.err.println("Error in worker " + threadId + ": " + e.getMessage());
-                e.printStackTrace();
             } finally {
                 activeWorkers.decrementAndGet();
             }
@@ -173,85 +108,89 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     private void initializeSpace() {
-        double ixbound = XBOUND - RBOUND;
-        double iybound = YBOUND - RBOUND;
-        double izbound = ZBOUND - RBOUND;
+        double ixbound = CommonCore.maxWidth - CommonCore.maxBodyRadius;
+        double iybound = CommonCore.maxHeight - CommonCore.maxBodyRadius;
+        double izbound = CommonCore.maxDepth - CommonCore.maxBodyRadius;
 
-        for (int i = 0; i < N; i++) {
-            mass[i] = MASS_OF_UNKNOWN * generateRand();
-            radius[i] = RBOUND * generateRand();
-            position[i].px = generateRand() * ixbound;
-            position[i].py = generateRand() * iybound;
-            position[i].pz = generateRand() * izbound;
-            velocity[i].vx = generateRandEx();
-            velocity[i].vy = generateRandEx();
-            velocity[i].vz = generateRandEx();
+        for (int i = 0; i < CommonCore.bodyCount; i++) {
+            masses.set(i, new Mass(CommonCore.defaultMass * generateRand()));
+            radiuses.set(i, CommonCore.maxBodyRadius * generateRand());
+            positions.set(i, new Position(
+                    generateRand() * ixbound,
+                    generateRand() * iybound,
+                    generateRand() * izbound));
+            velocities.set(i, new Velocity(generateRandEx(), generateRandEx(), generateRandEx()));
         }
     }
 
     private double computeDistance(Position a, Position b) {
-        return Math.sqrt(Math.pow(a.px - b.px, 2.0) +
-                Math.pow(a.py - b.py, 2.0) +
-                Math.pow(a.pz - b.pz, 2.0));
+        return Math.sqrt(Math.pow(a.horizontal() - b.horizontal(), 2.0) +
+                Math.pow(a.vertical() - b.vertical(), 2.0) +
+                Math.pow(a.depth() - b.depth(), 2.0));
     }
 
     private void computeForceForParticle(int index) {
-        force[index].fx = 0.0;
-        force[index].fy = 0.0;
-        force[index].fz = 0.0;
+        double forceX = 0.0, forceY = 0.0, forceZ = 0.0;
 
-        for (int j = 0; j < N; j++) {
-            if (j == index) continue;
+        for (int jindex = 0; jindex < CommonCore.bodyCount; jindex++) {
+            if (jindex == index) {
+                continue;
+            }
 
-            double d = computeDistance(position[index], position[j]);
-            double f = (G * (mass[index] * mass[j]) / (Math.pow(d, 2.0)));
+            final var distance = computeDistance(positions.get(index), positions.get(jindex));
+            if (distance == 0) {
+                continue;
+            }
+            final var multiplier = (
+                    CommonCore.GravitationalConstant * (masses.get(index).value() * masses.get(jindex).value())
+                            / (Math.pow(distance, 2.0))) / distance;
 
-            force[index].fx += f * ((position[j].px - position[index].px) / d);
-            force[index].fy += f * ((position[j].py - position[index].py) / d);
-            force[index].fz += f * ((position[j].pz - position[index].pz) / d);
+            forceX += multiplier * ((positions.get(jindex).horizontal() - positions.get(index).horizontal()));
+            forceY += multiplier * ((positions.get(jindex).vertical() - positions.get(index).vertical()));
+            forceZ += multiplier * ((positions.get(jindex).depth() - positions.get(index).depth()));
         }
+        forces.set(index, new Force(forceX, forceY, forceZ));
     }
 
-    private void updateVelocityAndPosition(int i) {
-        // Update velocity
-        velocity[i].vx += (force[i].fx / mass[i]) * DELTAT;
-        velocity[i].vy += (force[i].fy / mass[i]) * DELTAT;
-        velocity[i].vz += (force[i].fz / mass[i]) * DELTAT;
-
-        // Update position
-        position[i].px += velocity[i].vx * DELTAT;
-        position[i].py += velocity[i].vy * DELTAT;
-        position[i].pz += velocity[i].vz * DELTAT;
-
-        // Handle boundary conditions
-        handleBoundaryConditions(i);
+    private void updateVelocityAndPosition(int index) {
+        velocities.set(index, new Velocity(
+                velocities.get(index).horizontal() + (forces.get(index).horizontal() / masses.get(index).value()) * CommonCore.timeIncrement,
+                velocities.get(index).vertical() + (forces.get(index).vertical() / masses.get(index).value()) * CommonCore.timeIncrement,
+                velocities.get(index).depth() + (forces.get(index).depth() / masses.get(index).value()) * CommonCore.timeIncrement
+        ));
+        positions.set(index, new Position(
+                positions.get(index).horizontal() + velocities.get(index).horizontal() * CommonCore.timeIncrement,
+                positions.get(index).vertical() + velocities.get(index).vertical() * CommonCore.timeIncrement,
+                positions.get(index).depth() + velocities.get(index).depth() * CommonCore.timeIncrement));
+        handleBoundaryConditions(index);
     }
 
     private void handleBoundaryConditions(int i) {
-        if ((position[i].px + radius[i]) >= XBOUND ||
-                (position[i].px - radius[i]) <= 0) {
-            velocity[i].vx *= -1;
+        var x = positions.get(i).horizontal();
+        var y = positions.get(i).vertical();
+        var z = positions.get(i).depth();
+        if ((x + radiuses.get(i)) >= CommonCore.maxWidth || ((x - radiuses.get(i)) <= 0)) {
+            x *= -1;
         }
-        if ((position[i].py + radius[i] >= YBOUND) ||
-                (position[i].py - radius[i]) <= 0) {
-            velocity[i].vy *= -1;
+        if ((y + radiuses.get(i) >= CommonCore.maxHeight) || ((y - radiuses.get(i)) <= 0)) {
+            y *= -1;
         }
-        if ((position[i].pz + radius[i]) >= ZBOUND ||
-                (position[i].pz - radius[i]) <= 0) {
-            velocity[i].vz *= -1;
+        if ((z >= CommonCore.maxDepth) || ((z - radiuses.get(i)) <= 0)) {
+            z *= -1;
         }
+        positions.set(i, new Position(x, y, z));
     }
 
     private void writePositions(int iteration) {
         String filename = String.format("thread_positions_iter_%d.csv", iteration);
-        try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(filename)))) {
+        try (final var writer = new PrintWriter(new BufferedWriter(new FileWriter(filename)))) {
             writer.println("particle_id,x,y,z");
-            for (int i = 0; i < N; i++) {
+            for (var index = 0; index < CommonCore.bodyCount; index++) {
                 writer.printf("%d,%.6f,%.6f,%.6f%n",
-                        i,
-                        position[i].px,
-                        position[i].py,
-                        position[i].pz);
+                        index,
+                        positions.get(index).horizontal(),
+                        positions.get(index).vertical(),
+                        positions.get(index).depth());
             }
         } catch (IOException e) {
             System.err.println("Error writing to output file: " + e.getMessage());
@@ -259,186 +198,130 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     public void run() {
-        // Write initial positions
         writePositions(0);
 
-        // Create and start worker threads
-        for (int i = 0; i < numThreads; i++) {
-            workers[i] = new Thread(new Worker(i));
-            workers[i].start();
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(new Worker(i));
         }
-
-        // Wait for all workers to complete
-        try {
-            while (activeWorkers.get() > 0) {
-                Thread.sleep(100);
-            }
-        } catch (InterruptedException e) {
-            System.err.println("Main thread interrupted: " + e.getMessage());
-        } finally {
-            executor.shutdown();
-        }
+        executor.close();
     }
 
-    // Barnes-Hut methods
     private void generateOcttree() {
-        rootCell = new Cell(XBOUND, YBOUND, ZBOUND);
-        rootCell.index = 0;
-        rootCell.x = 0;
-        rootCell.y = 0;
-        rootCell.z = 0;
+        rootQuadrant = new Quadrant(
+                new Dimension(
+                        CommonCore.maxWidth,
+                        CommonCore.maxHeight,
+                        CommonCore.maxDepth),
+                new Position(0, 0, 0));
+        rootQuadrant.index = 0;
 
-        for (int i = 1; i < N; i++) {
-            Cell cell = rootCell;
-            while (cell.noSubcells != 0) {
-                int sc = locateSubcell(cell, i);
-                cell = cell.subcells[sc];
+        for (var i = 1; i < CommonCore.bodyCount; i++) {
+            var currentCell = rootQuadrant;
+            while (currentCell.innerQuadrantCount != 0) {
+                final var subcell = locateSubcell(currentCell, i);
+                currentCell = currentCell.innerQuadrants.get(subcell);
             }
-            addToCell(cell, i);
+            addToCell(currentCell, i);
         }
     }
 
-    private void setLocationOfSubcells(Cell cell, double width, double height, double depth) {
-        cell.subcells[0].x = cell.x;
-        cell.subcells[0].y = cell.y;
-        cell.subcells[0].z = cell.z;
-
-        cell.subcells[1].x = cell.x + width;
-        cell.subcells[1].y = cell.y;
-        cell.subcells[1].z = cell.z;
-
-        cell.subcells[2].x = cell.x + width;
-        cell.subcells[2].y = cell.y;
-        cell.subcells[2].z = cell.z + depth;
-
-        cell.subcells[3].x = cell.x;
-        cell.subcells[3].y = cell.y;
-        cell.subcells[3].z = cell.z + depth;
-
-        cell.subcells[4].x = cell.x;
-        cell.subcells[4].y = cell.y + height;
-        cell.subcells[4].z = cell.z;
-
-        cell.subcells[5].x = cell.x + width;
-        cell.subcells[5].y = cell.y + height;
-        cell.subcells[5].z = cell.z;
-
-        cell.subcells[6].x = cell.x + width;
-        cell.subcells[6].y = cell.y + height;
-        cell.subcells[6].z = cell.z + depth;
-
-        cell.subcells[7].x = cell.x;
-        cell.subcells[7].y = cell.y + height;
-        cell.subcells[7].z = cell.z + depth;
+    private void setLocationOfSubcells(Quadrant quadrant, double width, double height, double depth) {
+        quadrant.innerQuadrants.getFirst().setBottomLeftCorner(quadrant.bottomLeftCorner);
+        quadrant.innerQuadrants.get(1).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + width, quadrant.bottomLeftCorner.vertical(), quadrant.bottomLeftCorner.depth()));
+        quadrant.innerQuadrants.get(2).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + width, quadrant.bottomLeftCorner.vertical(), quadrant.bottomLeftCorner.depth() + depth));
+        quadrant.innerQuadrants.get(3).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal(), quadrant.bottomLeftCorner.vertical(), quadrant.bottomLeftCorner.depth() + depth));
+        quadrant.innerQuadrants.get(4).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal(), quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth()));
+        quadrant.innerQuadrants.get(5).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + height, quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth()));
+        quadrant.innerQuadrants.get(6).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + height, quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth() + depth));
+        quadrant.innerQuadrants.get(7).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal(), quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth() + depth));
     }
 
-    private void generateSubcells(Cell cell) {
-        double width = cell.width / 2.0;
-        double height = cell.height / 2.0;
-        double depth = cell.depth / 2.0;
+    private void generateSubcells(Quadrant quadrant) {
+        double width = quadrant.dimensions.horizontal() / 2.0;
+        double height = quadrant.dimensions.vertical() / 2.0;
+        double depth = quadrant.dimensions.depth() / 2.0;
 
-        cell.noSubcells = 8;
+        quadrant.innerQuadrantCount = 8;
 
-        for (int i = 0; i < cell.noSubcells; i++) {
-            cell.subcells[i] = new Cell(width, height, depth);
+        for (int i = 0; i < quadrant.innerQuadrantCount; i++) {
+            quadrant.innerQuadrants.set(i, new Quadrant(new Dimension(width, height, depth), new Position(0, 0, 0)));
         }
 
-        setLocationOfSubcells(cell, width, height, depth);
+        setLocationOfSubcells(quadrant, width, height, depth);
     }
 
-    private int locateSubcell(Cell cell, int index) {
-        if (position[index].px > cell.subcells[6].x) {
-            if (position[index].py > cell.subcells[6].y) {
-                return position[index].pz > cell.subcells[6].z ? 6 : 5;
+    private int locateSubcell(Quadrant quadrant, int index) {
+        final var sixth = quadrant.innerQuadrants.get(6).bottomLeftCorner;
+        final var sixthX = sixth.horizontal();
+        final var sixthY = sixth.vertical();
+        final var sixthZ = sixth.depth();
+        final var x = positions.get(index).horizontal();
+        final var y = positions.get(index).vertical();
+        final var z = positions.get(index).depth();
+        if (x > sixthX) {
+            if (y > sixthY) {
+                return z > sixthZ ? 6 : 5;
             } else {
-                return position[index].pz > cell.subcells[6].z ? 2 : 1;
+                return z > sixthZ ? 2 : 1;
             }
         } else {
-            if (position[index].py > cell.subcells[6].y) {
-                return position[index].pz > cell.subcells[6].z ? 7 : 4;
+            if (y > sixthY) {
+                return z > sixthZ ? 7 : 4;
             } else {
-                return position[index].pz > cell.subcells[6].z ? 3 : 0;
+                return z > sixthZ ? 3 : 0;
             }
         }
     }
 
-    private void addToCell(Cell cell, int index) {
-        if (cell.index == -1) {
-            cell.index = index;
+    private void addToCell(Quadrant quadrant, int index) {
+        if (quadrant.index == -1) {
+            quadrant.index = index;
             return;
         }
 
-        generateSubcells(cell);
+        generateSubcells(quadrant);
 
-        int sc1 = locateSubcell(cell, cell.index);
-        cell.subcells[sc1].index = cell.index;
+        int firstSubcellId = locateSubcell(quadrant, quadrant.index);
+        quadrant.innerQuadrants.get(firstSubcellId).index = quadrant.index;
 
-        int sc2 = locateSubcell(cell, index);
+        int secondSubcellId = locateSubcell(quadrant, index);
 
-        if (sc1 == sc2) {
-            addToCell(cell.subcells[sc1], index);
+        if (firstSubcellId == secondSubcellId) {
+            addToCell(quadrant.innerQuadrants.get(firstSubcellId), index);
         } else {
-            cell.subcells[sc2].index = index;
+            quadrant.innerQuadrants.get(secondSubcellId).index = index;
         }
     }
 
-    private Cell computeCellProperties(Cell cell) {
-        if (cell.noSubcells == 0) {
-            if (cell.index != -1) {
-                cell.mass = mass[cell.index];
-                return cell;
-            }
-        } else {
-            double tx = 0, ty = 0, tz = 0;
-            for (int i = 0; i < cell.noSubcells; i++) {
-                Cell temp = computeCellProperties(cell.subcells[i]);
-                if (temp != null) {
-                    cell.mass += temp.mass;
-                    tx += position[temp.index].px * temp.mass;
-                    ty += position[temp.index].py * temp.mass;
-                    tz += position[temp.index].pz * temp.mass;
-                }
-            }
+    private void computeForceFromCell(Quadrant quadrant, int index) {
+        double d = computeDistance(positions.get(index), positions.get(quadrant.index));
+        double f = (CommonCore.GravitationalConstant * (masses.get(index).value() * masses.get(quadrant.index).value()) / (Math.pow(d, 2.0)));
 
-            if (cell.mass > 0) {
-                cell.cx = tx / cell.mass;
-                cell.cy = ty / cell.mass;
-                cell.cz = tz / cell.mass;
-                return cell;
-            }
-        }
-        return null;
+//        forces.get(index).horizontal() += f * ((positions.get(cell.index).horizontal() - positions.get(index).horizontal()) / d);
+//        forces.get(index).vertical() += f * ((positions.get(cell.index).vertical() - positions.get(index).vertical()) / d);
+//        forces.get(index).depth() += f * ((positions.get(cell.index).depth() - positions.get(index).depth()) / d);
     }
 
-    private void computeForceFromCell(Cell cell, int index) {
-        double d = computeDistance(position[index], position[cell.index]);
-        double f = (G * (mass[index] * mass[cell.index]) / (Math.pow(d, 2.0)));
-
-        force[index].fx += f * ((position[cell.index].px - position[index].px) / d);
-        force[index].fy += f * ((position[cell.index].py - position[index].py) / d);
-        force[index].fz += f * ((position[cell.index].pz - position[index].pz) / d);
-    }
-
-    private void computeForceFromOcttree(Cell cell, int index) {
-        if (cell.noSubcells == 0) {
-            if (cell.index != -1 && cell.index != index) {
-                computeForceFromCell(cell, index);
+    private void computeForceFromOcttree(Quadrant quadrant, int index) {
+        if (quadrant.innerQuadrantCount == 0) {
+            if (quadrant.index != -1 && quadrant.index != index) {
+                computeForceFromCell(quadrant, index);
             }
         } else {
-            double d = computeDistance(position[index], position[cell.index]);
+            double d = computeDistance(positions.get(index), positions.get(quadrant.index));
 
-            if (THETA > (cell.width / d)) {
-                computeForceFromCell(cell, index);
+            if (CommonCore.angle > (quadrant.bottomLeftCorner.horizontal() / d)) {
+                computeForceFromCell(quadrant, index);
             } else {
-                for (int i = 0; i < cell.noSubcells; i++) {
-                    computeForceFromOcttree(cell.subcells[i], index);
+                for (int i = 0; i < quadrant.innerQuadrantCount; i++) {
+                    computeForceFromOcttree(quadrant.innerQuadrants.get(i), index);
                 }
             }
         }
     }
 
     public static void main(String[] args) {
-        ThreadedNBody simulation = new LocallyThreadedNBodyCalculator();
+        LocallyThreadedNBodyCalculator simulation = new LocallyThreadedNBodyCalculator();
         simulation.run();
     }
 }

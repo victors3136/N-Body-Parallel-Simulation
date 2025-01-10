@@ -3,32 +3,14 @@ import java.io.*;
 import java.util.Random;
 
 public class DistributedNBodyCalculator {
-    private static final int DEFAULT_N = 10000;   // Number of particles
-    private static final int DEFAULT_TIME = 1000; // Number of iterations
-    private static final double G = 6.67300e-11;  // Gravitational constant
-    private static final double XBOUND = 1.0e6;   // Width of space
-    private static final double YBOUND = 1.0e6;   // Height of space
-    private static final double ZBOUND = 1.0e6;   // Depth of space
-    private static final double RBOUND = 10;      // Upper bound on radius
-    private static final double DELTAT = 0.01;    // Time increment
-    private static final double THETA = 1.0;      // Opening angle for BH
-
-    private static final double MASS_OF_JUPITER = 1.899e27;
-    private static final double MASS_OF_EARTH = 5.974e24;
-    private static final double MASS_OF_MOON = 7.348e22;
-    private static final double MASS_OF_UNKNOWN = 1.899e12;
-
-    // Instance variables
     private Position[] position;   // Current positions for all particles
     private Velocity[] ivelocity;  // Initial velocity for all particles
-    private Velocity[] velocity;   // Velocity of particles in current processor
-    private double[] mass;         // Mass of each particle
+    private Velocity[] velocity;   // data.Velocity of particles in current processor
+    private double[] mass;         // data.Mass of each particle
     private double[] radius;       // Radius of each particle
-    private Force[] force;         // Force experienced by all particles
+    private Force[] force;         // data.Force experienced by all particles
     private Cell rootCell;         // Root of BH octtree
 
-    private int N;               // User specified particle count
-    private int TIME;           // User specified iterations
     private int rank;           // Rank of process
     private int size;           // Number of processes in the group
     private int partSize;       // Number of particles each processor is responsible for
@@ -87,31 +69,27 @@ public class DistributedNBodyCalculator {
                 throw new MPIException("Need at least one process");
             }
 
-            // Hardcode values instead of parsing arguments
-            N = 1000;      // Hardcoded number of particles
-            TIME = 500;    // Hardcoded number of iterations
 
             if (rank == 0) {
                 System.out.println("Using hardcoded values:");
-                System.out.println("N = " + N);
-                System.out.println("TIME = " + TIME);
+                System.out.println("N = " + CommonCore.bodyCount);
+                System.out.println("TIME = " + CommonCore.iterationCount);
             }
 
-            // Validate that N is divisible by the number of processes
-            if (N % size != 0) {
+            // Validate that CommonCore.N is divisible by the number of processes
+            if (CommonCore.bodyCount % size != 0) {
                 if (rank == 0) {
-                    System.out.println("Warning: Adjusting N to be divisible by number of processes");
+                    System.out.println("Warning: Adjusting CommonCore.N to be divisible by number of processes");
                 }
-                N = (N / size) * size;  // Adjust N to be divisible by size
             }
 
-            partSize = N / size;
+            partSize = CommonCore.bodyCount / size;
             pindex = rank * partSize;
 
             if (rank == 0) {
                 System.out.println("Initialization complete:");
-                System.out.println("N = " + N);
-                System.out.println("TIME = " + TIME);
+                System.out.println("CommonCore.N = " + CommonCore.bodyCount);
+                System.out.println("CommonCore.TIME = " + CommonCore.iterationCount);
                 System.out.println("Processes = " + size);
                 System.out.println("Particles per process = " + partSize);
             }
@@ -126,15 +104,15 @@ public class DistributedNBodyCalculator {
     }
 
     private void initializeArrays() {
-        mass = new double[N];
-        radius = new double[N];
-        position = new Position[N];
-        ivelocity = new Velocity[N];
+        mass = new double[CommonCore.bodyCount];
+        radius = new double[CommonCore.bodyCount];
+        position = new Position[CommonCore.bodyCount];
+        ivelocity = new Velocity[CommonCore.bodyCount];
         velocity = new Velocity[partSize];
         force = new Force[partSize];
 
-        // Initialize Position and Velocity objects
-        for (int i = 0; i < N; i++) {
+        // Initialize data.Position and data.Velocity objects
+        for (int i = 0; i < CommonCore.bodyCount; i++) {
             position[i] = new Position();
             ivelocity[i] = new Velocity();
         }
@@ -149,7 +127,7 @@ public class DistributedNBodyCalculator {
 
     public static void main(String[] args) {
         try {
-            NBody simulation = new DistributedNBodyCalculator(args);
+            DistributedNBodyCalculator simulation = new DistributedNBodyCalculator(args);
             simulation.run();
         } catch (Exception e) {
             System.err.println("Fatal error: " + e.getMessage());
@@ -174,13 +152,13 @@ public class DistributedNBodyCalculator {
 
     private void initializeSpace() {
         // Inner bounds to prevent generating particles outside space boundaries
-        double ixbound = XBOUND - RBOUND;
-        double iybound = YBOUND - RBOUND;
-        double izbound = ZBOUND - RBOUND;
+        double ixbound = CommonCore.maxWidth - CommonCore.maxBodyRadius;
+        double iybound = CommonCore.maxHeight - CommonCore.maxBodyRadius;
+        double izbound = CommonCore.maxDepth - CommonCore.maxBodyRadius;
 
-        for (int i = 0; i < N; i++) {
-            mass[i] = MASS_OF_UNKNOWN * generateRand();
-            radius[i] = RBOUND * generateRand();
+        for (int i = 0; i < CommonCore.bodyCount; i++) {
+            mass[i] = CommonCore.defaultMass * generateRand();
+            radius[i] = CommonCore.maxBodyRadius * generateRand();
             position[i].px = generateRand() * ixbound;
             position[i].py = generateRand() * iybound;
             position[i].pz = generateRand() * izbound;
@@ -204,8 +182,8 @@ public class DistributedNBodyCalculator {
     }
 
     private void reinitializeRadius() {
-        for (int i = 0; i < N; i++) {
-            for (int j = i + 1; j < N; j++) {
+        for (int i = 0; i < CommonCore.bodyCount; i++) {
+            for (int j = i + 1; j < CommonCore.bodyCount; j++) {
                 if (checkCollision(i, j)) {
                     double d = computeDistance(position[i], position[j]);
                     radius[i] = radius[j] = d/2.0;
@@ -220,13 +198,13 @@ public class DistributedNBodyCalculator {
             force[i].fy = 0.0;
             force[i].fz = 0.0;
 
-            for (int j = 0; j < N; j++) {
+            for (int j = 0; j < CommonCore.bodyCount; j++) {
                 if (j == (i + pindex)) continue;
 
                 double d = computeDistance(position[i + pindex], position[j]);
 
                 // Compute gravitational force according to Newton's law
-                double f = (G * (mass[i + pindex] * mass[j]) / (Math.pow(d, 2.0)));
+                double f = (CommonCore.GravitationalConstant * (mass[i + pindex] * mass[j]) / (Math.pow(d, 2.0)));
 
                 // Resolve forces in each direction
                 force[i].fx += f * ((position[j].px - position[i + pindex].px) / d);
@@ -238,28 +216,28 @@ public class DistributedNBodyCalculator {
 
     private void computeVelocity() {
         for (int i = 0; i < partSize; i++) {
-            velocity[i].vx += (force[i].fx / mass[i + pindex]) * DELTAT;
-            velocity[i].vy += (force[i].fy / mass[i + pindex]) * DELTAT;
-            velocity[i].vz += (force[i].fz / mass[i + pindex]) * DELTAT;
+            velocity[i].vx += (force[i].fx / mass[i + pindex]) * CommonCore.timeIncrement;
+            velocity[i].vy += (force[i].fy / mass[i + pindex]) * CommonCore.timeIncrement;
+            velocity[i].vz += (force[i].fz / mass[i + pindex]) * CommonCore.timeIncrement;
         }
     }
 
     private void computePositions() {
         for (int i = 0; i < partSize; i++) {
-            position[i + pindex].px += velocity[i].vx * DELTAT;
-            position[i + pindex].py += velocity[i].vy * DELTAT;
-            position[i + pindex].pz += velocity[i].vz * DELTAT;
+            position[i + pindex].px += velocity[i].vx * CommonCore.timeIncrement;
+            position[i + pindex].py += velocity[i].vy * CommonCore.timeIncrement;
+            position[i + pindex].pz += velocity[i].vz * CommonCore.timeIncrement;
 
             // Check if particles attempt to cross boundary
-            if ((position[i + pindex].px + radius[i + pindex]) >= XBOUND ||
+            if ((position[i + pindex].px + radius[i + pindex]) >= CommonCore.maxWidth ||
                     (position[i + pindex].px - radius[i + pindex]) <= 0) {
                 velocity[i].vx *= -1;
             }
-            else if ((position[i + pindex].py + radius[i + pindex] >= YBOUND) ||
+            else if ((position[i + pindex].py + radius[i + pindex] >= CommonCore.maxHeight) ||
                     (position[i + pindex].py - radius[i + pindex]) <= 0) {
                 velocity[i].vy *= -1;
             }
-            else if ((position[i + pindex].pz + radius[i + pindex]) >= ZBOUND ||
+            else if ((position[i + pindex].pz + radius[i + pindex]) >= CommonCore.maxDepth ||
                     (position[i + pindex].pz - radius[i + pindex]) <= 0) {
                 velocity[i].vz *= -1;
             }
@@ -274,7 +252,7 @@ public class DistributedNBodyCalculator {
                 writer.println("particle_id,x,y,z");
 
                 // Write each particle's position
-                for (int i = 0; i < N; i++) {
+                for (int i = 0; i < CommonCore.bodyCount; i++) {
                     writer.printf("%d,%.6f,%.6f,%.6f%n",
                             i,
                             position[i].px,
@@ -291,7 +269,7 @@ public class DistributedNBodyCalculator {
         try {
             if (rank == 0) {
                 System.out.printf("\nRunning simulation for %d bodies with %d iterations, and DELTAT = %f..%n%n",
-                        N, TIME, DELTAT);
+                        CommonCore.bodyCount, CommonCore.iterationCount, CommonCore.timeIncrement);
                 initializeSpace();
 
                 // Write initial positions
@@ -299,8 +277,8 @@ public class DistributedNBodyCalculator {
             }
 
             // Broadcast mass and position arrays
-            MPI.COMM_WORLD.Bcast(mass, 0, N, MPI.DOUBLE, 0);
-            MPI.COMM_WORLD.Bcast(position, 0, N, MPI.OBJECT, 0);
+            MPI.COMM_WORLD.Bcast(mass, 0, CommonCore.bodyCount, MPI.DOUBLE, 0);
+            MPI.COMM_WORLD.Bcast(position, 0, CommonCore.bodyCount, MPI.OBJECT, 0);
 
             // Scatter initial velocities
             MPI.COMM_WORLD.Scatter(
@@ -309,7 +287,7 @@ public class DistributedNBodyCalculator {
             );
 
             // Main simulation loop
-            for (int i = 0; i < TIME; i++) {
+            for (int i = 0; i < CommonCore.iterationCount; i++) {
                 generateOcttree();
                 computeCellProperties(rootCell);
                 computeForceFromOcttree();
@@ -329,7 +307,7 @@ public class DistributedNBodyCalculator {
 
                 // Optional: Print progress
                 if (rank == 0 && (i + 1) % 50 == 0) {
-                    System.out.printf("Completed iteration %d of %d%n", i + 1, TIME);
+                    System.out.printf("Completed iteration %d of %d%n", i + 1, CommonCore.iterationCount);
                 }
             }
 
@@ -342,14 +320,14 @@ public class DistributedNBodyCalculator {
 
     private void generateOcttree() {
         // Initialize root of octtree
-        rootCell = new Cell(XBOUND, YBOUND, ZBOUND);
+        rootCell = new Cell(CommonCore.maxWidth, CommonCore.maxHeight, CommonCore.maxDepth);
         rootCell.index = 0;
         rootCell.x = 0;
         rootCell.y = 0;
         rootCell.z = 0;
 
         // Add remaining particles to the tree
-        for (int i = 1; i < N; i++) {
+        for (int i = 1; i < CommonCore.bodyCount; i++) {
             Cell cell = rootCell;
 
             // Find which node to add the body to
@@ -496,7 +474,7 @@ public class DistributedNBodyCalculator {
         double d = computeDistance(position[index], position[cell.index]);
 
         // Compute gravitational force according to Newton's law
-        double f = (G * (mass[index] * mass[cell.index]) / (Math.pow(d, 2.0)));
+        double f = (CommonCore.GravitationalConstant * (mass[index] * mass[cell.index]) / (Math.pow(d, 2.0)));
 
         // Resolve forces in each direction
         force[index - pindex].fx += f * ((position[cell.index].px - position[index].px) / d);
@@ -512,7 +490,7 @@ public class DistributedNBodyCalculator {
         } else {
             double d = computeDistance(position[index], position[cell.index]);
 
-            if (THETA > (cell.width / d)) {
+            if (CommonCore.angle > (cell.width / d)) {
                 // Use approximation
                 computeForceFromCell(cell, index);
             } else {
@@ -543,7 +521,6 @@ public class DistributedNBodyCalculator {
         }
     }
 
-    // Add synchronization method for safety
     private void synchronizeProcesses() throws MPIException {
         MPI.COMM_WORLD.Barrier();
     }
