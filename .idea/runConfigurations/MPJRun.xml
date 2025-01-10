@@ -5,7 +5,7 @@
     </envs>
     <option name="MAIN_CLASS_NAME" value="runtime.starter.MPJRun" />
     <module name="Final-PDP-Project" />
-    <option name="VM_PARAMETERS" value="-jar C:\mpj-v0_44\lib\starter.jar Main -np 4" />
+    <option name="VM_PARAMETERS" value="-jar C:\mpj-v0_44\lib\starter.jar -np 4 ThreadedNBody" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
