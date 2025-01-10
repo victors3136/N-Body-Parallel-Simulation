@@ -4,22 +4,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class LocallyThreadedNBodyCalculator {
-    // Constants
-    private static final int DEFAULT_N = 10000;   // Number of particles
-    private static final int DEFAULT_TIME = 1000; // Number of iterations
-    private static final double G = 6.67300e-11;  // Gravitational constant
-    private static final double XBOUND = 1.0e6;   // Width of space
-    private static final double YBOUND = 1.0e6;   // Height of space
-    private static final double ZBOUND = 1.0e6;   // Depth of space
-    private static final double RBOUND = 10;      // Upper bound on radius
-    private static final double DELTAT = 0.01;    // Time increment
-    private static final double THETA = 1.0;      // Opening angle for BH
-
-    // Sample masses
-    private static final double MASS_OF_JUPITER = 1.899e27;
-    private static final double MASS_OF_EARTH = 5.974e24;
-    private static final double MASS_OF_MOON = 7.348e22;
-    private static final double MASS_OF_UNKNOWN = 1.899e12;
 
     // Thread-specific variables
     private final int numThreads;
@@ -36,8 +20,6 @@ public class LocallyThreadedNBodyCalculator {
     private Force[] force;         // Force experienced by all particles
     private Cell rootCell;         // Root of BH octtree
 
-    private int N;               // Number of particles
-    private int TIME;           // Number of iterations
     private int partSize;       // Number of particles each thread is responsible for
 
     // Inner classes for data structures
@@ -87,16 +69,13 @@ public class LocallyThreadedNBodyCalculator {
         this.workers = new Thread[numThreads];
         this.activeWorkers = new AtomicInteger(numThreads);
 
-        // Hardcoded values
-        N = 1000;      // Number of particles
-        TIME = 500;    // Number of iterations
 
         // Calculate partition size
-        partSize = N / numThreads;
+        partSize = CommonCore.N / numThreads;
 
         System.out.println("Initialization:");
-        System.out.println("N = " + N);
-        System.out.println("TIME = " + TIME);
+        System.out.println("CommonCore.N = " + CommonCore.N);
+        System.out.println("CommonCore.TIME = " + CommonCore.TIME);
         System.out.println("Threads = " + numThreads);
         System.out.println("Particles per thread = " + partSize);
 
@@ -105,14 +84,14 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     private void initializeArrays() {
-        mass = new double[N];
-        radius = new double[N];
-        position = new Position[N];
-        velocity = new Velocity[N];
-        force = new Force[N];
+        mass = new double[CommonCore.N];
+        radius = new double[CommonCore.N];
+        position = new Position[CommonCore.N];
+        velocity = new Velocity[CommonCore.N];
+        force = new Force[CommonCore.N];
 
         // Initialize all objects
-        for (int i = 0; i < N; i++) {
+        for (int i = 0; i < CommonCore.N; i++) {
             position[i] = new Position();
             velocity[i] = new Velocity();
             force[i] = new Force();
@@ -133,7 +112,7 @@ public class LocallyThreadedNBodyCalculator {
         @Override
         public void run() {
             try {
-                for (int iter = 0; iter < TIME; iter++) {
+                for (int iter = 0; iter < CommonCore.TIME; iter++) {
                     // Compute forces for this partition
                     for (int i = startIndex; i < endIndex; i++) {
                         computeForceForParticle(i);
@@ -150,7 +129,7 @@ public class LocallyThreadedNBodyCalculator {
                     if (threadId == 0) {
                         writePositions(iter);
                         if ((iter + 1) % 50 == 0) {
-                            System.out.printf("Completed iteration %d of %d%n", iter + 1, TIME);
+                            System.out.printf("Completed iteration %d of %d%n", iter + 1, CommonCore.TIME);
                         }
                     }
                     barrier.await();
@@ -173,13 +152,13 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     private void initializeSpace() {
-        double ixbound = XBOUND - RBOUND;
-        double iybound = YBOUND - RBOUND;
-        double izbound = ZBOUND - RBOUND;
+        double ixbound = CommonCore.XBOUND - CommonCore.RBOUND;
+        double iybound = CommonCore.YBOUND - CommonCore.RBOUND;
+        double izbound = CommonCore.ZBOUND - CommonCore.RBOUND;
 
-        for (int i = 0; i < N; i++) {
-            mass[i] = MASS_OF_UNKNOWN * generateRand();
-            radius[i] = RBOUND * generateRand();
+        for (int i = 0; i < CommonCore.N; i++) {
+            mass[i] = CommonCore.MASS_OF_UNKNOWN * generateRand();
+            radius[i] = CommonCore.RBOUND * generateRand();
             position[i].px = generateRand() * ixbound;
             position[i].py = generateRand() * iybound;
             position[i].pz = generateRand() * izbound;
@@ -200,11 +179,11 @@ public class LocallyThreadedNBodyCalculator {
         force[index].fy = 0.0;
         force[index].fz = 0.0;
 
-        for (int j = 0; j < N; j++) {
+        for (int j = 0; j < CommonCore.N; j++) {
             if (j == index) continue;
 
             double d = computeDistance(position[index], position[j]);
-            double f = (G * (mass[index] * mass[j]) / (Math.pow(d, 2.0)));
+            double f = (CommonCore.G * (mass[index] * mass[j]) / (Math.pow(d, 2.0)));
 
             force[index].fx += f * ((position[j].px - position[index].px) / d);
             force[index].fy += f * ((position[j].py - position[index].py) / d);
@@ -214,29 +193,29 @@ public class LocallyThreadedNBodyCalculator {
 
     private void updateVelocityAndPosition(int i) {
         // Update velocity
-        velocity[i].vx += (force[i].fx / mass[i]) * DELTAT;
-        velocity[i].vy += (force[i].fy / mass[i]) * DELTAT;
-        velocity[i].vz += (force[i].fz / mass[i]) * DELTAT;
+        velocity[i].vx += (force[i].fx / mass[i]) * CommonCore.DELTAT;
+        velocity[i].vy += (force[i].fy / mass[i]) * CommonCore.DELTAT;
+        velocity[i].vz += (force[i].fz / mass[i]) * CommonCore.DELTAT;
 
         // Update position
-        position[i].px += velocity[i].vx * DELTAT;
-        position[i].py += velocity[i].vy * DELTAT;
-        position[i].pz += velocity[i].vz * DELTAT;
+        position[i].px += velocity[i].vx * CommonCore.DELTAT;
+        position[i].py += velocity[i].vy * CommonCore.DELTAT;
+        position[i].pz += velocity[i].vz * CommonCore.DELTAT;
 
         // Handle boundary conditions
         handleBoundaryConditions(i);
     }
 
     private void handleBoundaryConditions(int i) {
-        if ((position[i].px + radius[i]) >= XBOUND ||
+        if ((position[i].px + radius[i]) >= CommonCore.XBOUND ||
                 (position[i].px - radius[i]) <= 0) {
             velocity[i].vx *= -1;
         }
-        if ((position[i].py + radius[i] >= YBOUND) ||
+        if ((position[i].py + radius[i] >= CommonCore.YBOUND) ||
                 (position[i].py - radius[i]) <= 0) {
             velocity[i].vy *= -1;
         }
-        if ((position[i].pz + radius[i]) >= ZBOUND ||
+        if ((position[i].pz + radius[i]) >= CommonCore.ZBOUND ||
                 (position[i].pz - radius[i]) <= 0) {
             velocity[i].vz *= -1;
         }
@@ -246,7 +225,7 @@ public class LocallyThreadedNBodyCalculator {
         String filename = String.format("thread_positions_iter_%d.csv", iteration);
         try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(filename)))) {
             writer.println("particle_id,x,y,z");
-            for (int i = 0; i < N; i++) {
+            for (int i = 0; i < CommonCore.N; i++) {
                 writer.printf("%d,%.6f,%.6f,%.6f%n",
                         i,
                         position[i].px,
@@ -282,13 +261,13 @@ public class LocallyThreadedNBodyCalculator {
 
     // Barnes-Hut methods
     private void generateOcttree() {
-        rootCell = new Cell(XBOUND, YBOUND, ZBOUND);
+        rootCell = new Cell(CommonCore.XBOUND, CommonCore.YBOUND, CommonCore.ZBOUND);
         rootCell.index = 0;
         rootCell.x = 0;
         rootCell.y = 0;
         rootCell.z = 0;
 
-        for (int i = 1; i < N; i++) {
+        for (int i = 1; i < CommonCore.N; i++) {
             Cell cell = rootCell;
             while (cell.noSubcells != 0) {
                 int sc = locateSubcell(cell, i);
@@ -412,7 +391,7 @@ public class LocallyThreadedNBodyCalculator {
 
     private void computeForceFromCell(Cell cell, int index) {
         double d = computeDistance(position[index], position[cell.index]);
-        double f = (G * (mass[index] * mass[cell.index]) / (Math.pow(d, 2.0)));
+        double f = (CommonCore.G * (mass[index] * mass[cell.index]) / (Math.pow(d, 2.0)));
 
         force[index].fx += f * ((position[cell.index].px - position[index].px) / d);
         force[index].fy += f * ((position[cell.index].py - position[index].py) / d);
@@ -427,7 +406,7 @@ public class LocallyThreadedNBodyCalculator {
         } else {
             double d = computeDistance(position[index], position[cell.index]);
 
-            if (THETA > (cell.width / d)) {
+            if (CommonCore.THETA > (cell.width / d)) {
                 computeForceFromCell(cell, index);
             } else {
                 for (int i = 0; i < cell.noSubcells; i++) {
@@ -438,7 +417,7 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     public static void main(String[] args) {
-        ThreadedNBody simulation = new LocallyThreadedNBodyCalculator();
+        LocallyThreadedNBodyCalculator simulation = new LocallyThreadedNBodyCalculator();
         simulation.run();
     }
 }

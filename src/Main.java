@@ -4,7 +4,7 @@ import mpi.MPIException;
 public class Main {
     public static void main(String[] args) {
         try {
-            NBody simulation = new NBody(args);
+            DistributedNBodyCalculator simulation = new DistributedNBodyCalculator(args);
             simulation.run();
         } catch (Exception e) {
             System.err.println("Fatal error: " + e.getMessage());
