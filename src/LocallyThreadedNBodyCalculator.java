@@ -102,48 +102,48 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     private void initializeSpace() {
-        double ixbound = CommonCore.maxWidth - CommonCore.maxBodyRadius;
-        double iybound = CommonCore.maxHeight - CommonCore.maxBodyRadius;
-        double izbound = CommonCore.maxDepth - CommonCore.maxBodyRadius;
+        double innerXBound = CommonCore.maxWidth - CommonCore.maxBodyRadius;
+        double innerYBound = CommonCore.maxHeight - CommonCore.maxBodyRadius;
 
         for (int i = 0; i < CommonCore.bodyCount; i++) {
-            masses.set(i, new Mass(CommonCore.defaultMass * generateRand()));
-            radiuses.set(i, CommonCore.maxBodyRadius * generateRand());
-            positions.set(i, new Position(
-                    generateRand() * ixbound,
-                    generateRand() * iybound,
-                    generateRand() * izbound));
-            velocities.set(i, new Velocity(generateRandEx(), generateRandEx(), generateRandEx()));
+            points.set(i, new Point(
+                    new Position(
+                            generateRand() * innerXBound,
+                            generateRand() * innerYBound),
+                    CommonCore.maxBodyRadius * generateRand(),
+                    new Mass(CommonCore.defaultMass * generateRand()),
+                    new Velocity(generateRandEx(), generateRandEx()),
+                    new Force()
+            ));
         }
     }
 
     private double computeDistance(Position a, Position b) {
         return Math.sqrt(Math.pow(a.horizontal() - b.horizontal(), 2.0) +
-                Math.pow(a.vertical() - b.vertical(), 2.0) +
-                Math.pow(a.depth() - b.depth(), 2.0));
+                Math.pow(a.vertical() - b.vertical(), 2.0));
     }
 
     private void computeForceForParticle(int index) {
-        double forceX = 0.0, forceY = 0.0, forceZ = 0.0;
+        double forceX = 0.0, forceY = 0.0;
 
         for (int jindex = 0; jindex < CommonCore.bodyCount; jindex++) {
             if (jindex == index) {
                 continue;
             }
 
-            final var distance = computeDistance(positions.get(index), positions.get(jindex));
+            final var distance = computeDistance(points.get(index).position(), points.get(jindex).position());
             if (distance == 0) {
                 continue;
             }
             final var multiplier = (
-                    CommonCore.GravitationalConstant * (masses.get(index).value() * masses.get(jindex).value())
+                    CommonCore.GravitationalConstant * (points.get(index).mass().value() * points.get(jindex).mass().value())
                             / (Math.pow(distance, 2.0))) / distance;
 
-            forceX += multiplier * ((positions.get(jindex).horizontal() - positions.get(index).horizontal()));
-            forceY += multiplier * ((positions.get(jindex).vertical() - positions.get(index).vertical()));
-            forceZ += multiplier * ((positions.get(jindex).depth() - positions.get(index).depth()));
+            forceX += multiplier * ((points.get(jindex).position().horizontal() - points.get(index).position().horizontal()));
+            forceY += multiplier * ((points.get(jindex).position().vertical() - points.get(index).position().vertical()));
+
         }
-        forces.set(index, new Force(forceX, forceY, forceZ));
+        points.get(index).setForce(new Force(forceX, forceY));
     }
 
     private void updateVelocityAndPosition(int index) {
