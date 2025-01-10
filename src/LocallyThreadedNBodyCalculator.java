@@ -1,6 +1,7 @@
 import data.*;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
@@ -8,17 +9,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class LocallyThreadedNBodyCalculator {
 
-    // Thread-specific variables
     private final int threadCount;
     private final CyclicBarrier barrier;
     private final ExecutorService executor;
     private final AtomicInteger activeWorkers;
-
-    private List<Position> positions;
-    private List<Velocity> velocities;
-    private List<Mass> masses;
-    private List<Double> radiuses;
-    private List<Force> forces;
+    private final List<Point> points;
     private Quadrant rootQuadrant;
 
     private final int partitionSize;
@@ -30,6 +25,7 @@ public class LocallyThreadedNBodyCalculator {
         this.barrier = new CyclicBarrier(threadCount);
         this.executor = Executors.newFixedThreadPool(threadCount);
         this.activeWorkers = new AtomicInteger(threadCount);
+        this.points = new ArrayList<>();
 
         partitionSize = CommonCore.bodyCount / threadCount;
 
@@ -45,16 +41,14 @@ public class LocallyThreadedNBodyCalculator {
 
 
     private void initializeArrays() {
-        masses = List.of(new Mass[CommonCore.bodyCount]);
-        radiuses = List.of(new Double[CommonCore.bodyCount]);
-        positions = List.of(new Position[CommonCore.bodyCount]);
-        velocities = List.of(new Velocity[CommonCore.bodyCount]);
-        forces = List.of(new Force[CommonCore.bodyCount]);
-
         for (int i = 0; i < CommonCore.bodyCount; i++) {
-            positions.set(i, new Position(0, 0, 0));
-            velocities.set(i, new Velocity(0, 0, 0));
-            forces.set(i, new Force(0, 0, 0));
+            points.add(new Point(
+                    new Position(),
+                    0,
+                    new Mass(),
+                    new Velocity(),
+                    new Force()
+            ));
         }
     }
 

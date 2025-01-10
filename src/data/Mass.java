@@ -1,7 +1,7 @@
 package data;
 
 public record Mass (double value){
-    Mass(){
+    public Mass(){
         this(0);
     }
 }
