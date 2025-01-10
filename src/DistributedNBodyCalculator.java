@@ -5,10 +5,10 @@ import java.util.Random;
 public class DistributedNBodyCalculator {
     private Position[] position;   // Current positions for all particles
     private Velocity[] ivelocity;  // Initial velocity for all particles
-    private Velocity[] velocity;   // Velocity of particles in current processor
-    private double[] mass;         // Mass of each particle
+    private Velocity[] velocity;   // data.Velocity of particles in current processor
+    private double[] mass;         // data.Mass of each particle
     private double[] radius;       // Radius of each particle
-    private Force[] force;         // Force experienced by all particles
+    private Force[] force;         // data.Force experienced by all particles
     private Cell rootCell;         // Root of BH octtree
 
     private int rank;           // Rank of process
@@ -111,7 +111,7 @@ public class DistributedNBodyCalculator {
         velocity = new Velocity[partSize];
         force = new Force[partSize];
 
-        // Initialize Position and Velocity objects
+        // Initialize data.Position and data.Velocity objects
         for (int i = 0; i < CommonCore.bodyCount; i++) {
             position[i] = new Position();
             ivelocity[i] = new Velocity();

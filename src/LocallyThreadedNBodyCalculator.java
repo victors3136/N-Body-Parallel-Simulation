@@ -1,5 +1,6 @@
+import data.*;
+
 import java.io.*;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
@@ -18,7 +19,7 @@ public class LocallyThreadedNBodyCalculator {
     private List<Mass> masses;
     private List<Double> radiuses;
     private List<Force> forces;
-    private Cell rootCell;
+    private Quadrant rootQuadrant;
 
     private final int partitionSize;
 
@@ -206,51 +207,51 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     private void generateOcttree() {
-        rootCell = new Cell(
+        rootQuadrant = new Quadrant(
                 new Dimension(
                         CommonCore.maxWidth,
                         CommonCore.maxHeight,
                         CommonCore.maxDepth),
                 new Position(0, 0, 0));
-        rootCell.index = 0;
+        rootQuadrant.index = 0;
 
         for (var i = 1; i < CommonCore.bodyCount; i++) {
-            var currentCell = rootCell;
-            while (currentCell.subcellCount != 0) {
+            var currentCell = rootQuadrant;
+            while (currentCell.innerQuadrantCount != 0) {
                 final var subcell = locateSubcell(currentCell, i);
-                currentCell = currentCell.subcells.get(subcell);
+                currentCell = currentCell.innerQuadrants.get(subcell);
             }
             addToCell(currentCell, i);
         }
     }
 
-    private void setLocationOfSubcells(Cell cell, double width, double height, double depth) {
-        cell.subcells.getFirst().setPosition(cell.position);
-        cell.subcells.get(1).setPosition(new Position(cell.position.horizontal() + width, cell.position.vertical(), cell.position.depth()));
-        cell.subcells.get(2).setPosition(new Position(cell.position.horizontal() + width, cell.position.vertical(), cell.position.depth() + depth));
-        cell.subcells.get(3).setPosition(new Position(cell.position.horizontal(), cell.position.vertical(), cell.position.depth() + depth));
-        cell.subcells.get(4).setPosition(new Position(cell.position.horizontal(), cell.position.vertical() + height, cell.position.depth()));
-        cell.subcells.get(5).setPosition(new Position(cell.position.horizontal() + height, cell.position.vertical() + height, cell.position.depth()));
-        cell.subcells.get(6).setPosition(new Position(cell.position.horizontal() + height, cell.position.vertical() + height, cell.position.depth() + depth));
-        cell.subcells.get(7).setPosition(new Position(cell.position.horizontal(), cell.position.vertical() + height, cell.position.depth() + depth));
+    private void setLocationOfSubcells(Quadrant quadrant, double width, double height, double depth) {
+        quadrant.innerQuadrants.getFirst().setBottomLeftCorner(quadrant.bottomLeftCorner);
+        quadrant.innerQuadrants.get(1).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + width, quadrant.bottomLeftCorner.vertical(), quadrant.bottomLeftCorner.depth()));
+        quadrant.innerQuadrants.get(2).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + width, quadrant.bottomLeftCorner.vertical(), quadrant.bottomLeftCorner.depth() + depth));
+        quadrant.innerQuadrants.get(3).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal(), quadrant.bottomLeftCorner.vertical(), quadrant.bottomLeftCorner.depth() + depth));
+        quadrant.innerQuadrants.get(4).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal(), quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth()));
+        quadrant.innerQuadrants.get(5).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + height, quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth()));
+        quadrant.innerQuadrants.get(6).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal() + height, quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth() + depth));
+        quadrant.innerQuadrants.get(7).setBottomLeftCorner(new Position(quadrant.bottomLeftCorner.horizontal(), quadrant.bottomLeftCorner.vertical() + height, quadrant.bottomLeftCorner.depth() + depth));
     }
 
-    private void generateSubcells(Cell cell) {
-        double width = cell.size.horizontal() / 2.0;
-        double height = cell.size.vertical() / 2.0;
-        double depth = cell.size.depth() / 2.0;
+    private void generateSubcells(Quadrant quadrant) {
+        double width = quadrant.dimensions.horizontal() / 2.0;
+        double height = quadrant.dimensions.vertical() / 2.0;
+        double depth = quadrant.dimensions.depth() / 2.0;
 
-        cell.subcellCount = 8;
+        quadrant.innerQuadrantCount = 8;
 
-        for (int i = 0; i < cell.subcellCount; i++) {
-            cell.subcells.set(i, new Cell(new Dimension(width, height, depth), new Position(0, 0, 0)));
+        for (int i = 0; i < quadrant.innerQuadrantCount; i++) {
+            quadrant.innerQuadrants.set(i, new Quadrant(new Dimension(width, height, depth), new Position(0, 0, 0)));
         }
 
-        setLocationOfSubcells(cell, width, height, depth);
+        setLocationOfSubcells(quadrant, width, height, depth);
     }
 
-    private int locateSubcell(Cell cell, int index) {
-        final var sixth = cell.subcells.get(6).position;
+    private int locateSubcell(Quadrant quadrant, int index) {
+        final var sixth = quadrant.innerQuadrants.get(6).bottomLeftCorner;
         final var sixthX = sixth.horizontal();
         final var sixthY = sixth.vertical();
         final var sixthZ = sixth.depth();
@@ -272,48 +273,48 @@ public class LocallyThreadedNBodyCalculator {
         }
     }
 
-    private void addToCell(Cell cell, int index) {
-        if (cell.index == -1) {
-            cell.index = index;
+    private void addToCell(Quadrant quadrant, int index) {
+        if (quadrant.index == -1) {
+            quadrant.index = index;
             return;
         }
 
-        generateSubcells(cell);
+        generateSubcells(quadrant);
 
-        int firstSubcellId = locateSubcell(cell, cell.index);
-        cell.subcells.get(firstSubcellId).index = cell.index;
+        int firstSubcellId = locateSubcell(quadrant, quadrant.index);
+        quadrant.innerQuadrants.get(firstSubcellId).index = quadrant.index;
 
-        int secondSubcellId = locateSubcell(cell, index);
+        int secondSubcellId = locateSubcell(quadrant, index);
 
         if (firstSubcellId == secondSubcellId) {
-            addToCell(cell.subcells.get(firstSubcellId), index);
+            addToCell(quadrant.innerQuadrants.get(firstSubcellId), index);
         } else {
-            cell.subcells.get(secondSubcellId).index = index;
+            quadrant.innerQuadrants.get(secondSubcellId).index = index;
         }
     }
 
-    private void computeForceFromCell(Cell cell, int index) {
-        double d = computeDistance(positions.get(index), positions.get(cell.index));
-        double f = (CommonCore.GravitationalConstant * (masses.get(index).value() * masses.get(cell.index).value()) / (Math.pow(d, 2.0)));
+    private void computeForceFromCell(Quadrant quadrant, int index) {
+        double d = computeDistance(positions.get(index), positions.get(quadrant.index));
+        double f = (CommonCore.GravitationalConstant * (masses.get(index).value() * masses.get(quadrant.index).value()) / (Math.pow(d, 2.0)));
 
 //        forces.get(index).horizontal() += f * ((positions.get(cell.index).horizontal() - positions.get(index).horizontal()) / d);
 //        forces.get(index).vertical() += f * ((positions.get(cell.index).vertical() - positions.get(index).vertical()) / d);
 //        forces.get(index).depth() += f * ((positions.get(cell.index).depth() - positions.get(index).depth()) / d);
     }
 
-    private void computeForceFromOcttree(Cell cell, int index) {
-        if (cell.subcellCount == 0) {
-            if (cell.index != -1 && cell.index != index) {
-                computeForceFromCell(cell, index);
+    private void computeForceFromOcttree(Quadrant quadrant, int index) {
+        if (quadrant.innerQuadrantCount == 0) {
+            if (quadrant.index != -1 && quadrant.index != index) {
+                computeForceFromCell(quadrant, index);
             }
         } else {
-            double d = computeDistance(positions.get(index), positions.get(cell.index));
+            double d = computeDistance(positions.get(index), positions.get(quadrant.index));
 
-            if (CommonCore.angle > (cell.position.horizontal() / d)) {
-                computeForceFromCell(cell, index);
+            if (CommonCore.angle > (quadrant.bottomLeftCorner.horizontal() / d)) {
+                computeForceFromCell(quadrant, index);
             } else {
-                for (int i = 0; i < cell.subcellCount; i++) {
-                    computeForceFromOcttree(cell.subcells.get(i), index);
+                for (int i = 0; i < quadrant.innerQuadrantCount; i++) {
+                    computeForceFromOcttree(quadrant.innerQuadrants.get(i), index);
                 }
             }
         }
