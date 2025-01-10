@@ -3,7 +3,7 @@ import java.util.Random;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ThreadedNBody {
+public class LocallyThreadedNBodyCalculator {
     // Constants
     private static final int DEFAULT_N = 10000;   // Number of particles
     private static final int DEFAULT_TIME = 1000; // Number of iterations
@@ -79,7 +79,7 @@ public class ThreadedNBody {
     private Random random = new Random();
 
     // Constructor
-    public ThreadedNBody() {
+    public LocallyThreadedNBodyCalculator() {
         // Use number of available processors for threads
         this.numThreads = Runtime.getRuntime().availableProcessors();
         this.barrier = new CyclicBarrier(numThreads);
@@ -438,7 +438,7 @@ public class ThreadedNBody {
     }
 
     public static void main(String[] args) {
-        ThreadedNBody simulation = new ThreadedNBody();
+        ThreadedNBody simulation = new LocallyThreadedNBodyCalculator();
         simulation.run();
     }
 }

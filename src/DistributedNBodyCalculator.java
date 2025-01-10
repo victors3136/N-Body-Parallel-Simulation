@@ -2,8 +2,7 @@ import mpi.*;
 import java.io.*;
 import java.util.Random;
 
-public class NBody {
-    // Constants
+public class DistributedNBodyCalculator {
     private static final int DEFAULT_N = 10000;   // Number of particles
     private static final int DEFAULT_TIME = 1000; // Number of iterations
     private static final double G = 6.67300e-11;  // Gravitational constant
@@ -14,7 +13,6 @@ public class NBody {
     private static final double DELTAT = 0.01;    // Time increment
     private static final double THETA = 1.0;      // Opening angle for BH
 
-    // Sample masses
     private static final double MASS_OF_JUPITER = 1.899e27;
     private static final double MASS_OF_EARTH = 5.974e24;
     private static final double MASS_OF_MOON = 7.348e22;
@@ -78,7 +76,7 @@ public class NBody {
     private Random random = new Random();
 
     // Constructor
-    public NBody(String[] args) throws MPIException {
+    public DistributedNBodyCalculator(String[] args) throws MPIException {
         try {
             MPI.Init(args);
 
@@ -151,7 +149,7 @@ public class NBody {
 
     public static void main(String[] args) {
         try {
-            NBody simulation = new NBody(args);
+            NBody simulation = new DistributedNBodyCalculator(args);
             simulation.run();
         } catch (Exception e) {
             System.err.println("Fatal error: " + e.getMessage());
