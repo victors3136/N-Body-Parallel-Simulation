@@ -4,7 +4,7 @@ public record Position(
         double horizontal,
         double vertical
 ) {
-    Position(){
+    public Position(){
         this(0, 0);
     }
 }

@@ -4,7 +4,7 @@ public record Force (
     double horizontal,
     double vertical
 ){
-    Force(){
+    public Force(){
         this(0,0);
     }
 }
