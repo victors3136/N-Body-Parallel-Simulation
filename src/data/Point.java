@@ -7,12 +7,20 @@ public class Point {
     private Velocity velocity;
     private Force force;
 
+    public Point() {
+        this(new Position(), 0, new Mass(), new Velocity(), new Force());
+    }
+
     public Point(Position position, double radius, Mass mass, Velocity velocity) {
+        this(position, radius, mass, velocity, new Force());
+    }
+
+    public Point(Position position, double radius, Mass mass, Velocity velocity, Force force) {
         this.position = position;
         this.radius = radius;
         this.mass = mass;
         this.velocity = velocity;
-        force = new Force();
+        this.force = force;
     }
 
     public Position position() {

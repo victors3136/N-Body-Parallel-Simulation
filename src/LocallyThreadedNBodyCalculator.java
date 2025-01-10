@@ -1,4 +1,5 @@
 import data.*;
+import data.Quadrant.RelativePosition;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -6,6 +7,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static data.Quadrant.RelativePosition.*;
 
 public class LocallyThreadedNBodyCalculator {
 
@@ -179,11 +182,10 @@ public class LocallyThreadedNBodyCalculator {
         try (final var writer = new PrintWriter(new BufferedWriter(new FileWriter(filename)))) {
             writer.println("particle_id,x,y,z");
             for (var index = 0; index < CommonCore.bodyCount; index++) {
-                writer.printf("%d,%.6f,%.6f,%.6f%n",
+                writer.printf("%d,%.6f,%.6f%n",
                         index,
-                        positions.get(index).horizontal(),
-                        positions.get(index).vertical(),
-                        positions.get(index).depth());
+                        points.get(index).position().horizontal(),
+                        points.get(index).position().vertical());
             }
         } catch (IOException e) {
             System.err.println("Error writing to output file: " + e.getMessage());
@@ -199,7 +201,7 @@ public class LocallyThreadedNBodyCalculator {
         executor.close();
     }
 
-    private void generateOcttree() {
+    private void generateQuadTree() {
         rootQuadrant = new Quadrant(
                 -1,
                 new Dimension(CommonCore.maxWidth,
@@ -210,8 +212,8 @@ public class LocallyThreadedNBodyCalculator {
         for (var i = 1; i < CommonCore.bodyCount; i++) {
             var currentCell = rootQuadrant;
             while (currentCell.innerQuadrantCount() != 0) {
-                final var subcell = locateSubcell(currentCell, i);
-                currentCell = currentCell.innerQuadrants().get(subcell);
+                final var subcell = locateQuadrant(currentCell, i);
+                currentCell = currentCell.innerQuadrants().get(subcell.ordinal());
             }
             addToCell(currentCell, i);
         }
@@ -243,25 +245,22 @@ public class LocallyThreadedNBodyCalculator {
         setLocationOfSubcells(quadrant, width, height);
     }
 
-    private int locateSubcell(Quadrant quadrant, int index) {
-        final var bottomLeft = quadrant.innerQuadrants().get(2).bottomLeftCorner();
-        final var bottomLeftX = bottomLeft.horizontal();
-        final var bottomLeftY = bottomLeft.vertical();
-        final var x = points.get(index).position().horizontal();
-        final var y = points.get(index).position().vertical();
-        if (x > bottomLeftX) {
-            if (y > bottomLeftY) {
-                return z > sixthZ ? 6 : 5;
-            } else {
-                return z > sixthZ ? 2 : 1;
-            }
-        } else {
-            if (y > bottomLeftY) {
-                return z > sixthZ ? 7 : 4;
-            } else {
-                return z > sixthZ ? 3 : 0;
-            }
+    private RelativePosition locateQuadrant(Quadrant quadrant, int index) {
+        final var bottomLeft = quadrant.innerQuadrants().getFirst().bottomLeftCorner();
+        final var bottomLeftWidth = bottomLeft.horizontal();
+        final var bottomLeftHeight = bottomLeft.vertical();
+        final var width = points.get(index).position().horizontal();
+        final var height = points.get(index).position().vertical();
+        if (width == bottomLeftWidth && height == bottomLeftHeight) {
+            return BOTTOM_LEFT;
         }
+        if (width == bottomLeftWidth && height != bottomLeftHeight) {
+            return TOP_LEFT;
+        }
+        if (height == bottomLeftHeight) {
+            return TOP_RIGHT;
+        }
+        return BOTTOM_LEFT;
     }
 
     private void addToCell(Quadrant quadrant, int index) {
@@ -272,27 +271,31 @@ public class LocallyThreadedNBodyCalculator {
 
         generateSubcells(quadrant);
 
-        int firstSubcellId = locateSubcell(quadrant, quadrant.index());
-        quadrant.innerQuadrants().get(firstSubcellId).setIndex(quadrant.index());
+        final var firstSubcellId = locateQuadrant(quadrant, quadrant.index());
+        quadrant.innerQuadrants().get(firstSubcellId.ordinal()).setIndex(quadrant.index());
 
-        int secondSubcellId = locateSubcell(quadrant, index);
+        final var secondSubcellId = locateQuadrant(quadrant, index);
 
         if (firstSubcellId == secondSubcellId) {
-            addToCell(quadrant.innerQuadrants().get(firstSubcellId), index);
+            addToCell(quadrant.innerQuadrants().get(firstSubcellId.ordinal()), index);
         } else {
-            quadrant.innerQuadrants().get(secondSubcellId).setIndex(index);
+            quadrant.innerQuadrants().get(secondSubcellId.ordinal()).setIndex(index);
         }
     }
 
     private void computeForceFromCell(Quadrant quadrant, int index) {
-        double d = computeDistance(points.get(index).position(), points.get(quadrant.index()).position());
-        double f = (CommonCore.GravitationalConstant * (points.get(index).mass().value() * points.get(quadrant.index()).mass().value()) / (Math.pow(d, 2.0)));
-
-//        forces.get(index).horizontal() += f * ((positions.get(cell.index).horizontal() - positions.get(index).horizontal()) / d);
-//        forces.get(index).vertical() += f * ((positions.get(cell.index).vertical() - positions.get(index).vertical()) / d);
+        final var distance = computeDistance(points.get(index).position(), points.get(quadrant.index()).position());
+        final var multiplier = (CommonCore.GravitationalConstant * (points.get(index).mass().value() * points.get(quadrant.index()).mass().value()) / (Math.pow(distance, 2.0)));
+        final var force = points.get(index).force();
+        var fx = force.horizontal();
+        var fy = force.vertical();
+//        fx += ;
+//        fy += ;
+//        forces.get(index).horizontal() += multiplier * ((positions.get(cell.index).horizontal() - positions.get(index).horizontal()) / distance);
+//        forces.get(index).vertical() += multiplier * ((positions.get(cell.index).vertical() - positions.get(index).vertical()) / distance);
     }
 
-    private void computeForceFromOcttree(Quadrant quadrant, int index) {
+    private void computeForceFromQuadtree(Quadrant quadrant, int index) {
         if (quadrant.innerQuadrantCount() == 0) {
             if (quadrant.index() != -1 && quadrant.index() != index) {
                 computeForceFromCell(quadrant, index);
@@ -304,7 +307,7 @@ public class LocallyThreadedNBodyCalculator {
                 computeForceFromCell(quadrant, index);
             } else {
                 for (int i = 0; i < quadrant.innerQuadrantCount(); i++) {
-                    computeForceFromOcttree(quadrant.innerQuadrants().get(i), index);
+                    computeForceFromQuadtree(quadrant.innerQuadrants().get(i), index);
                 }
             }
         }

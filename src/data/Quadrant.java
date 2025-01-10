@@ -4,6 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Quadrant {
+    public enum RelativePosition {
+        BOTTOM_LEFT, TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT
+    }
+
     private int index;
     private int innerQuadrantCount;
     private Mass mass;
@@ -12,7 +16,7 @@ public class Quadrant {
     private Dimension dimensions;
     private List<Quadrant> innerQuadrants;
 
-    Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
+    public Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
         this(index,
                 0,
                 new Mass(),
@@ -22,13 +26,13 @@ public class Quadrant {
                 new ArrayList<>());
     }
 
-    Quadrant(int index,
-             int innerQuadrantCount,
-             Mass mass,
-             Position bottomLeftCorner,
-             Position centerOfMass,
-             Dimension dimensions,
-             List<Quadrant> innerQuadrants) {
+    public Quadrant(int index,
+                    int innerQuadrantCount,
+                    Mass mass,
+                    Position bottomLeftCorner,
+                    Position centerOfMass,
+                    Dimension dimensions,
+                    List<Quadrant> innerQuadrants) {
         this.index = index;
         this.innerQuadrantCount = innerQuadrantCount;
         this.mass = mass;
