@@ -1,9 +1,10 @@
 package data;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-public class Quadrant {
+public class Quadrant implements Serializable {
     private int index;
     private int innerQuadrantCount;
     private Mass mass;
@@ -12,7 +13,7 @@ public class Quadrant {
     private Dimension dimensions;
     private List<Quadrant> innerQuadrants;
 
-    Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
+    public Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
         this(index,
                 0,
                 new Mass(),
@@ -22,7 +23,7 @@ public class Quadrant {
                 new ArrayList<>());
     }
 
-    Quadrant(int index,
+    public Quadrant(int index,
              int innerQuadrantCount,
              Mass mass,
              Position bottomLeftCorner,

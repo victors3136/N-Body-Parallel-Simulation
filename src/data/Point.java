@@ -1,6 +1,8 @@
 package data;
 
-public class Point {
+import java.io.Serializable;
+
+public class Point implements Serializable {
     private final Position position;
     private final double radius;
     private final Mass mass;
@@ -13,6 +15,14 @@ public class Point {
         this.mass = mass;
         this.velocity = velocity;
         force = new Force();
+    }
+
+    public Point(Position position, double radius, Mass mass, Velocity velocity, Force force) {
+        this.position = position;
+        this.radius = radius;
+        this.mass = mass;
+        this.velocity = velocity;
+        this.force = force;
     }
 
     public Position position() {

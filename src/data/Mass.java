@@ -1,6 +1,8 @@
 package data;
 
-public record Mass (double value){
+import java.io.Serializable;
+
+public record Mass (double value)implements Serializable {
     public Mass(){
         this(0);
     }
