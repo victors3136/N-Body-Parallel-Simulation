@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="MPJRun" type="Application" factoryName="Application">
+    <envs>
+      <env name="MPJ_HOME" value="C:\mpj-v0_44" />
+    </envs>
+    <option name="MAIN_CLASS_NAME" value="runtime.starter.MPJRun" />
+    <module name="Final-PDP-Project" />
+    <option name="VM_PARAMETERS" value="-jar C:\mpj-v0_44\lib\starter.jar Main -np 4" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
