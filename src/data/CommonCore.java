@@ -1,3 +1,5 @@
+package data;
+
 public class CommonCore {
     public static final double GravitationalConstant = 6.67300e-11;
     public static final double maxWidth = 1.0e6;

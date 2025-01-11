@@ -18,6 +18,16 @@ public class Quadrant implements Serializable {
         this(0, 0, new Mass(), new Position(), new Position(), new Dimension(), new ArrayList<>());
     }
 
+    public Quadrant(Dimension dimensions, Position bottomLeftCorner) {
+        this(0,
+                0,
+                new Mass(),
+                bottomLeftCorner,
+                new Position(),
+                dimensions,
+                new ArrayList<>());
+    }
+
     public Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
         this(index,
                 0,
@@ -134,22 +144,18 @@ public class Quadrant implements Serializable {
         final var position = point.position();
         final var x = position.horizontal();
         final var y = position.vertical();
-        if (x < anchorX || y < anchorY) {
+        if (((x < anchorX) || (y < anchorY)) || ((x > anchorX + 2 * halfWidth) || (y > anchorY + 2 * halfHeight))) {
             throw new RuntimeException("How did we get here?");
         }
         if ((x < anchorX + halfWidth) && (y < anchorY + halfHeight)) {
             return innerQuadrants.get(RelativePosition.BOTTOM_LEFT.ordinal());
-        }
-        if ((x <= anchorX + halfWidth) && (y <= anchorY + 2 * halfHeight)) {
+        } else if ((x <= anchorX + halfWidth) && (y <= anchorY + 2 * halfHeight)) {
             return innerQuadrants.get(RelativePosition.TOP_LEFT.ordinal());
-        }
-        if ((x <= anchorX + 2 * halfWidth) && (y <= anchorY + 2 * halfHeight)) {
+        } else if ((x <= anchorX + 2 * halfWidth) && (y <= anchorY + 2 * halfHeight)) {
             return innerQuadrants.get(RelativePosition.TOP_RIGHT.ordinal());
-        }
-        if ((x <= anchorX + 2 * halfWidth) && (y <= anchorY + halfHeight)) {
+        } else {
             return innerQuadrants.get(RelativePosition.BOTTOM_RIGHT.ordinal());
         }
-        throw new RuntimeException("How did we get here?");
     }
 
     private void subdivide() {
@@ -183,4 +189,42 @@ public class Quadrant implements Serializable {
         }
         innerQuadrantCount = 4;
     }
+
+    private void addForceActingOn(Point point) {
+        double fx = point.force().horizontal();
+        double fy = point.force().vertical();
+
+        if (innerQuadrantCount == 0) {
+            if (innerPoint != null && !innerPoint.equals(point)) {
+                final var f = point.directForce(innerPoint);
+                fx += f.horizontal();
+                fy += f.vertical();
+                point.setForce(new Force(fx, fy));
+            }
+            return;
+        }
+        final var size = dimensions.horizontal();
+        final var distance = point.position().distance(centerOfMass);
+        if (size / distance < CommonCore.angle) {
+
+            final var f = point.directForce(this.asPoint());
+            fx += f.horizontal();
+            fy += f.vertical();
+            point.setForce(new Force(fx, fy));
+            return;
+        }
+        for (final var innerQ : innerQuadrants) {
+            if (innerQ.innerQuadrantCount != 0 || innerQ.innerPoint != null) {
+                innerQ.addForceActingOn(point);
+            }
+        }
+    }
+
+    public Point asPoint() {
+        Point virtualPoint = new Point();
+        virtualPoint.setPosition(centerOfMass);
+        virtualPoint.setMass(mass);
+        return virtualPoint;
+    }
 }
+

@@ -4,10 +4,10 @@ import java.util.List;
 
 public class LocallyThreadedNBodyCalculator {
 
-    private final int threadCount;
     private final List<Point> points;
     private Quadrant rootQuadrant;
 
+    private final int threadCount;
     private final int partitionSize;
 
     public LocallyThreadedNBodyCalculator() {
@@ -24,29 +24,15 @@ public class LocallyThreadedNBodyCalculator {
     }
 
     public void run() {
-        rootQuadrant = generateQuadrants(CommonCore.maxWidth, CommonCore.maxHeight);
-
-        rootQuadrant = new Quadrant();
-        rootQuadrant.setDimensions(new Dimension(CommonCore.maxWidth, CommonCore.maxHeight));
-        points.forEach(point -> {
-           rootQuadrant.insert(point);
-        });
-    }
-
-    private Quadrant generateQuadrants(double maxWidth, double maxHeight) {
-
-        var quadrant = new Quadrant();
-        quadrant.bottomLeftCorner = new Position(0, 0)
-        quadrant.size = new Dimension(spaceDimension.dx, spaceDimension.dy)
-        quadrant.subquadrants = []
-        quadrant.subquadrantCount = 0
-        quadrant.centerOfMass = new Position(0, 0)
-        quadrant.overallMass = new Mass(0)
-        return quadrant
+        rootQuadrant = new Quadrant(
+                new Dimension(CommonCore.maxWidth, CommonCore.maxHeight),
+                new Position()
+        );
+        points.forEach(point -> rootQuadrant.insert(point));
     }
 
     public static void main(String[] args) {
         LocallyThreadedNBodyCalculator simulation = new LocallyThreadedNBodyCalculator();
-//        simulation.run();
+        simulation.run();
     }
 }
