@@ -60,6 +60,7 @@ public class Point implements Serializable {
     public void setMass(Mass mass) {
         this.mass = mass;
     }
+
     public void setRadius(Radius radius) {
         this.radius = radius;
     }

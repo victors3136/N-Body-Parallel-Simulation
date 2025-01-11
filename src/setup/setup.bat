@@ -8,7 +8,7 @@ CALL conda init
 REM Create a new Conda environment with Python
 conda create -y -n %ENV_NAME% python=3.10 pip
 
-REM Deactivate first, because sometimes it bugs (for me, atleast)
+REM Deactivate first, because sometimes it bugs (for me, at least)
 CALL conda deactivate
 
 REM Activate the environment

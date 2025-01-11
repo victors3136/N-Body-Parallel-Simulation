@@ -12,7 +12,7 @@ public class LocallyThreadedNBodyCalculator {
 
     public LocallyThreadedNBodyCalculator() {
         this.threadCount = Runtime.getRuntime().availableProcessors();
-        this.points = Generator.points(CommonCore.bodyCount);
+        this.points = RandomGenerator.points(CommonCore.bodyCount);
         partitionSize = CommonCore.bodyCount / threadCount;
 
         System.out.println("Initialization:");

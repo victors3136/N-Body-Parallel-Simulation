@@ -4,41 +4,44 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.IntStream;
 
-class Generator {
+class RandomGenerator {
     static private final Random random;
 
     static {
         random = new Random();
     }
 
-    private static Position nextPosition() {
+    public static Position nextPosition() {
+
+        final var innerHorizontalBound = CommonCore.maxWidth - CommonCore.maxBodyRadius;
+        final var innerVerticalBound = CommonCore.maxHeight - CommonCore.maxBodyRadius;
         return new Position(
-                random.nextDouble() % CommonCore.maxWidth,
-                random.nextDouble() % CommonCore.maxHeight);
+                random.nextDouble() % innerHorizontalBound,
+                random.nextDouble() % innerVerticalBound);
     }
 
-    private static Force nextForce() {
+    public static Force nextForce() {
         return new Force(
                 random.nextDouble() % (CommonCore.maxInitialForce) + CommonCore.minInitialForce,
                 random.nextDouble() % (CommonCore.maxInitialForce) + CommonCore.minInitialForce);
     }
 
-    private static Mass nextMass() {
+    public static Mass nextMass() {
         return new Mass(random.nextDouble() % CommonCore.maxMass);
     }
 
-    private static Radius nextRadius() {
+    public static Radius nextRadius() {
         return new Radius(random.nextDouble() % CommonCore.maxBodyRadius);
     }
 
-    private static Velocity nextVelocity() {
+    public static Velocity nextVelocity() {
         return new Velocity(
                 random.nextDouble() % CommonCore.maxInitialVelocity,
                 random.nextDouble() % CommonCore.maxInitialVelocity
         );
     }
 
-    private static Point nextPoint() {
+    public static Point nextPoint() {
         return new Point(nextPosition(), nextRadius(), nextMass(), nextVelocity(), nextForce());
     }
 

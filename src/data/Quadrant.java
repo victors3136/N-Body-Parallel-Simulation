@@ -39,12 +39,12 @@ public class Quadrant implements Serializable {
     }
 
     public Quadrant(int index,
-             int innerQuadrantCount,
-             Mass mass,
-             Position bottomLeftCorner,
-             Position centerOfMass,
-             Dimension dimensions,
-             List<Quadrant> innerQuadrants) {
+                    int innerQuadrantCount,
+                    Mass mass,
+                    Position bottomLeftCorner,
+                    Position centerOfMass,
+                    Dimension dimensions,
+                    List<Quadrant> innerQuadrants) {
         this.index = index;
         this.innerQuadrantCount = innerQuadrantCount;
         this.mass = mass;
@@ -137,6 +137,11 @@ public class Quadrant implements Serializable {
     }
 
     private Quadrant subquadrantContaining(Point point) {
+        final var BOTTOM_LEFT = 0;
+        final var TOP_LEFT = 1;
+        final var TOP_RIGHT = 2;
+        final var BOTTOM_RIGHT = 3;
+
         final var anchorX = bottomLeftCorner.horizontal();
         final var anchorY = bottomLeftCorner.vertical();
         final var halfHeight = dimensions.vertical() / 2;
@@ -148,13 +153,14 @@ public class Quadrant implements Serializable {
             throw new RuntimeException("How did we get here?");
         }
         if ((x < anchorX + halfWidth) && (y < anchorY + halfHeight)) {
-            return innerQuadrants.get(RelativePosition.BOTTOM_LEFT.ordinal());
+            //noinspection SequencedCollectionMethodCanBeUsed
+            return innerQuadrants.get(BOTTOM_LEFT);
         } else if ((x <= anchorX + halfWidth) && (y <= anchorY + 2 * halfHeight)) {
-            return innerQuadrants.get(RelativePosition.TOP_LEFT.ordinal());
+            return innerQuadrants.get(TOP_LEFT);
         } else if ((x <= anchorX + 2 * halfWidth) && (y <= anchorY + 2 * halfHeight)) {
-            return innerQuadrants.get(RelativePosition.TOP_RIGHT.ordinal());
+            return innerQuadrants.get(TOP_RIGHT);
         } else {
-            return innerQuadrants.get(RelativePosition.BOTTOM_RIGHT.ordinal());
+            return innerQuadrants.get(BOTTOM_RIGHT);
         }
     }
 
@@ -190,7 +196,7 @@ public class Quadrant implements Serializable {
         innerQuadrantCount = 4;
     }
 
-    private void addForceActingOn(Point point) {
+    public void addForceActingOn(Point point) {
         double fx = point.force().horizontal();
         double fy = point.force().vertical();
 
