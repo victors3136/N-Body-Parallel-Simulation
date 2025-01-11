@@ -115,21 +115,7 @@ public class DistributedNBodyCalculator {
         if (rank != 0) {
             return;
         }
-        final var filename = String.format("src/visualise/csv/positions_iter_%d.csv", iteration);
-        try (final var fileWriter = new FileWriter(filename);
-             final var bufferedWriter = new BufferedWriter(fileWriter);
-             final var printWriter = new PrintWriter(bufferedWriter)) {
-            printWriter.println("particle_id,x,y");
-            for (var index = 0; index < CommonCore.bodyCount; index++) {
-                final var point = points.get(index);
-                printWriter.printf("%d,%.6f,%.6f%n",
-                        index,
-                        point.position().horizontal(),
-                        point.position().vertical());
-            }
-        } catch (IOException e) {
-            System.err.println("Error writing to output file: " + e.getMessage());
-        }
+        CommonCore.write(iteration, points, CommonCore.Mode.DISTRIBUTED);
     }
 
     public void run() throws MPIException {
@@ -245,42 +231,43 @@ public class DistributedNBodyCalculator {
 
     private Quadrant computeQuadrantProperties(Quadrant quadrant) {
         if (quadrant.innerQuadrantCount() == 0) {
-            if (quadrant.index() != -1) {
-                return new Quadrant(
-                        quadrant.index(),
-                        0,
-                        points.get(quadrant.index()).mass(),
-                        quadrant.bottomLeftCorner(),
-                        points.get(quadrant.index()).position(),
-                        quadrant.dimensions(),
-                        quadrant.innerQuadrants()
-                );
+            if (quadrant.index() == -1) {
+                return null;
             }
-        } else {
-            var totalMass = 0.0;
-            var weightedX = 0.0;
-            var weightedY = 0.0;
-
-            for (Quadrant subQuadrant : quadrant.innerQuadrants()) {
-                Quadrant computed = computeQuadrantProperties(subQuadrant);
-                if (computed != null) {
-                    totalMass += computed.mass().value();
-                    weightedX += points.get(computed.index()).position().horizontal() * computed.mass().value();
-                    weightedY += points.get(computed.index()).position().vertical() * computed.mass().value();
-                }
-            }
-
             return new Quadrant(
                     quadrant.index(),
-                    quadrant.innerQuadrantCount(),
-                    new Mass(totalMass),
+                    0,
+                    points.get(quadrant.index()).mass(),
                     quadrant.bottomLeftCorner(),
-                    new Position(weightedX / totalMass, weightedY / totalMass),
+                    points.get(quadrant.index()).position(),
                     quadrant.dimensions(),
                     quadrant.innerQuadrants()
             );
+
         }
-        return null;
+        var totalMass = 0.0;
+        var centerX = 0.0;
+        var centerY = 0.0;
+
+        for (Quadrant subQuadrant : quadrant.innerQuadrants()) {
+            Quadrant computed = computeQuadrantProperties(subQuadrant);
+            if (computed != null) {
+                totalMass += computed.mass().value();
+                centerX += points.get(computed.index()).position().horizontal() * computed.mass().value();
+                centerY += points.get(computed.index()).position().vertical() * computed.mass().value();
+            }
+        }
+
+        return new Quadrant(
+                quadrant.index(),
+                quadrant.innerQuadrantCount(),
+                new Mass(totalMass),
+                quadrant.bottomLeftCorner(),
+                new Position(centerX / totalMass, centerY / totalMass),
+                quadrant.dimensions(),
+                quadrant.innerQuadrants()
+        );
+
     }
 
     private void computeForceFromQuadtree() {

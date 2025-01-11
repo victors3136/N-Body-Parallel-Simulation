@@ -149,8 +149,13 @@ public class Quadrant implements Serializable {
         final var position = point.position();
         final var x = position.horizontal();
         final var y = position.vertical();
-        if (((x < anchorX) || (y < anchorY)) || ((x > anchorX + 2 * halfWidth) || (y > anchorY + 2 * halfHeight))) {
-            throw new RuntimeException("How did we get here?");
+        if ((x < anchorX) || (y < anchorY)) {
+            throw new RuntimeException("Underflow\nCoords : %s, %s, %s, %s, %s, %s"
+                    .formatted(x, y, anchorX, anchorY, halfWidth, halfHeight));
+        }
+        if ((x > (anchorX + 2 * halfWidth)) || (y > (anchorY + 2 * halfHeight))) {
+            throw new RuntimeException("Overflow\nCoords : %s, %s, %s, %s, %s, %s"
+                    .formatted(x, y, anchorX, anchorY, halfWidth, halfHeight));
         }
         if ((x < anchorX + halfWidth) && (y < anchorY + halfHeight)) {
             //noinspection SequencedCollectionMethodCanBeUsed
@@ -197,8 +202,8 @@ public class Quadrant implements Serializable {
     }
 
     public void addForceActingOn(Point point) {
-        double fx = point.force().horizontal();
-        double fy = point.force().vertical();
+        var fx = point.force().horizontal();
+        var fy = point.force().vertical();
 
         if (innerQuadrantCount == 0) {
             if (innerPoint != null && !innerPoint.equals(point)) {
