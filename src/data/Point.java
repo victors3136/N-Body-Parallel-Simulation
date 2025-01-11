@@ -3,13 +3,13 @@ package data;
 import java.io.Serializable;
 
 public class Point implements Serializable {
-    private final Position position;
-    private final double radius;
-    private final Mass mass;
-    private final Velocity velocity;
+    private Position position;
+    private Radius radius;
+    private Mass mass;
+    private Velocity velocity;
     private Force force;
 
-    public Point(Position position, double radius, Mass mass, Velocity velocity) {
+    public Point(Position position, Radius radius, Mass mass, Velocity velocity) {
         this.position = position;
         this.radius = radius;
         this.mass = mass;
@@ -17,7 +17,7 @@ public class Point implements Serializable {
         force = new Force();
     }
 
-    public Point(Position position, double radius, Mass mass, Velocity velocity, Force force) {
+    public Point(Position position, Radius radius, Mass mass, Velocity velocity, Force force) {
         this.position = position;
         this.radius = radius;
         this.mass = mass;
@@ -29,7 +29,7 @@ public class Point implements Serializable {
         return position;
     }
 
-    public double radius() {
+    public Radius radius() {
         return radius;
     }
 
@@ -47,5 +47,13 @@ public class Point implements Serializable {
 
     public void setForce(Force force) {
         this.force = force;
+    }
+
+    public void setVelocity(Velocity velocity) {
+        this.velocity = velocity;
+    }
+
+    public void setPosition(Position position) {
+        this.position = position;
     }
 }
