@@ -92,40 +92,43 @@ public class DistributedNBodyCalculator {
     }
 
     private void computePositions() {
-        for (var i = 0; i < partSize; i++) {
-            final var point = points.get(i + pindex);
-            var horizontalPosition = point.position().horizontal() +
-                    point.velocity().horizontal() * CommonCore.timeIncrement;
-            var verticalPosition = point.position().vertical() +
-                    point.velocity().vertical() * CommonCore.timeIncrement;
+        IntStream.range(0, partSize).map(i -> i + pindex).mapToObj(i -> points.get(i)).forEach(
+                point -> {
+                    final var newPX = point.position().horizontal() +
+                            point.velocity().horizontal() * CommonCore.timeIncrement;
+                    final var newPY = point.position().vertical() +
+                            point.velocity().vertical() * CommonCore.timeIncrement;
+                    final var newVY = point.velocity().horizontal() * (
+                            ((newPX + point.radius().value()) >= CommonCore.maxWidth ||
+                                    (newPX - point.radius().value()) <= 0) ? -1 : 1);
+                    final var newVX = point.velocity().vertical() * (
+                            ((newPY + point.radius().value() >= CommonCore.maxHeight) ||
+                                    (newPY - point.radius().value()) <= 0) ? -1 : 1);
+                    point.setPosition(new Position(newPX, newPY));
+                    point.setVelocity(new Velocity(newVY, newVX));
 
-            if ((horizontalPosition + point.radius().value()) >= CommonCore.maxWidth ||
-                    (horizontalPosition - point.radius().value()) <= 0) {
-                horizontalPosition *= -1;
-            }
-            if ((verticalPosition + point.radius().value() >= CommonCore.maxHeight) ||
-                    (verticalPosition - point.radius().value()) <= 0) {
-                verticalPosition *= -1;
-            }
-            point.setPosition(new Position(horizontalPosition, verticalPosition));
-        }
+                }
+        );
     }
 
     private void writePositions(int iteration) {
-        if (rank == 0) {
-            final var filename = String.format("src/visualise/csv/positions_iter_%d.csv", iteration);
-            try (PrintWriter writer = new PrintWriter(new BufferedWriter(new FileWriter(filename)))) {
-                writer.println("particle_id,x,y");
-                for (var i = 0; i < CommonCore.bodyCount; i++) {
-                    final var point = points.get(i);
-                    writer.printf("%d,%.6f,%.6f%n",
-                            i,
-                            point.position().horizontal(),
-                            point.position().vertical());
-                }
-            } catch (IOException e) {
-                System.err.println("Error writing to output file: " + e.getMessage());
+        if (rank != 0) {
+            return;
+        }
+        final var filename = String.format("src/visualise/csv/positions_iter_%d.csv", iteration);
+        try (final var fileWriter = new FileWriter(filename);
+             final var bufferedWriter = new BufferedWriter(fileWriter);
+             final var printWriter = new PrintWriter(bufferedWriter)) {
+            printWriter.println("particle_id,x,y");
+            for (var index = 0; index < CommonCore.bodyCount; index++) {
+                final var point = points.get(index);
+                printWriter.printf("%d,%.6f,%.6f%n",
+                        index,
+                        point.position().horizontal(),
+                        point.position().vertical());
             }
+        } catch (IOException e) {
+            System.err.println("Error writing to output file: " + e.getMessage());
         }
     }
 
