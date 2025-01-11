@@ -28,6 +28,8 @@ public class LocallyThreadedNBodyCalculator {
 
     public void run() {
         for (var iteration = 0; iteration < CommonCore.iterationCount; iteration++) {
+
+            System.out.println("Iteration " + iteration);
             rootQuadrant = new Quadrant(
                     new Dimension(CommonCore.maxWidth, CommonCore.maxHeight),
                     new Position()
@@ -38,12 +40,13 @@ public class LocallyThreadedNBodyCalculator {
             computeForces();
 
             points.forEach(Point::updatePosition);
+
             writeOut(iteration);
         }
     }
 
     private void writeOut(int iteration) {
-        CommonCore.write(iteration, points, CommonCore.Mode.DISTRIBUTED);
+        CommonCore.write(iteration, points, CommonCore.Mode.THREADED);
     }
 
     private void computeForces() {

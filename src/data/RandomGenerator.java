@@ -1,10 +1,10 @@
-import data.*;
+package data;
 
 import java.util.List;
 import java.util.Random;
 import java.util.stream.IntStream;
 
-class RandomGenerator {
+public class RandomGenerator {
     static private final Random random;
 
     static {
@@ -13,32 +13,29 @@ class RandomGenerator {
 
     public static Position nextPosition() {
 
-        final var innerHorizontalBound = CommonCore.maxWidth - CommonCore.maxBodyRadius;
-        final var innerVerticalBound = CommonCore.maxHeight - CommonCore.maxBodyRadius;
+        final var innerHorizontalBound = CommonCore.maxWidth;
+        final var innerVerticalBound = CommonCore.maxHeight;
         return new Position(
-                random.nextDouble() % innerHorizontalBound,
-                random.nextDouble() % innerVerticalBound);
+                random.nextDouble() * innerHorizontalBound,
+                random.nextDouble() * innerVerticalBound);
     }
 
     public static Force nextForce() {
         return new Force(
-                random.nextDouble() % (CommonCore.maxInitialForce) + CommonCore.minInitialForce,
-                random.nextDouble() % (CommonCore.maxInitialForce) + CommonCore.minInitialForce);
+                random.nextDouble() * (CommonCore.maxInitialForce) + CommonCore.minInitialForce,
+                random.nextDouble() * (CommonCore.maxInitialForce) + CommonCore.minInitialForce);
     }
 
     public static Mass nextMass() {
-        return new Mass(random.nextDouble() % CommonCore.maxMass);
+        return new Mass(random.nextDouble() * CommonCore.maxMass);
     }
 
     public static Radius nextRadius() {
-        return new Radius(random.nextDouble() % CommonCore.maxBodyRadius);
+        return new Radius(random.nextDouble() * CommonCore.maxBodyRadius);
     }
 
     public static Velocity nextVelocity() {
-        return new Velocity(
-                random.nextDouble() % CommonCore.maxInitialVelocity,
-                random.nextDouble() % CommonCore.maxInitialVelocity
-        );
+        return new Velocity();
     }
 
     public static Point nextPoint() {
@@ -69,5 +66,9 @@ class RandomGenerator {
     public static List<Point> points(int size) {
         assert size > 0;
         return IntStream.range(0, size).mapToObj(_ -> nextPoint()).toList();
+    }
+
+    public static double nextDouble() {
+        return random.nextDouble();
     }
 }

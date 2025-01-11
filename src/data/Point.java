@@ -83,12 +83,29 @@ public class Point implements Serializable {
         final var fx = 0;
         final var fy = 0;
 
-        final var vx = velocity.horizontal() + force.horizontal() / mass.value() * CommonCore.timeIncrement;
-        final var vy = velocity().vertical() + force.vertical() / mass.value() * CommonCore.timeIncrement;
+        var vx = velocity.horizontal() + force.horizontal() / mass.value() * CommonCore.timeIncrement;
+        var vy = velocity().vertical() + force.vertical() / mass.value() * CommonCore.timeIncrement;
 
-        final var px = position.horizontal() + velocity.horizontal() * CommonCore.timeIncrement;
-        final var py = position.vertical() + velocity.vertical() * CommonCore.timeIncrement;
-
+        var px = position.horizontal() + velocity.horizontal() * CommonCore.timeIncrement;
+        var py = position.vertical() + velocity.vertical() * CommonCore.timeIncrement;
+        if((px <= 0) || (px >= CommonCore.maxWidth)){
+            vx *= -1;
+        }
+        if((py <= 0) || (py >= CommonCore.maxHeight)){
+            vy *= -1;
+        }
+        if (px == 0) {
+            px += RandomGenerator.nextDouble();
+        }
+        if (px == CommonCore.maxWidth) {
+            px -= RandomGenerator.nextDouble();
+        }
+        if (py == 0) {
+            py += RandomGenerator.nextDouble();
+        }
+        if (py == CommonCore.maxHeight) {
+            py -= RandomGenerator.nextDouble();
+        }
         force = new Force(fx, fy);
         velocity = new Velocity(vx, vy);
         position = new Position(px, py);

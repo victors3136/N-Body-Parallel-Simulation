@@ -1,8 +1,6 @@
 import data.*;
 import mpi.*;
 
-import java.io.*;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
@@ -99,10 +97,10 @@ public class DistributedNBodyCalculator {
                     final var newPY = point.position().vertical() +
                             point.velocity().vertical() * CommonCore.timeIncrement;
                     final var newVY = point.velocity().horizontal() * (
-                            ((newPX + point.radius().value()) >= CommonCore.maxWidth ||
+                            ((newPX + point.radius().value()) >= (CommonCore.maxWidth - CommonCore.boundingBoxTolerance) ||
                                     (newPX - point.radius().value()) <= 0) ? -1 : 1);
                     final var newVX = point.velocity().vertical() * (
-                            ((newPY + point.radius().value() >= CommonCore.maxHeight) ||
+                            ((newPY + point.radius().value()) >= (CommonCore.maxHeight - CommonCore.boundingBoxTolerance) ||
                                     (newPY - point.radius().value()) <= 0) ? -1 : 1);
                     point.setPosition(new Position(newPX, newPY));
                     point.setVelocity(new Velocity(newVY, newVX));
@@ -166,7 +164,7 @@ public class DistributedNBodyCalculator {
             var currentQuadrant = rootQuadrant;
             while (currentQuadrant.innerQuadrantCount() != 0) {
                 final var subQuadrant = locateSubQuadrant(currentQuadrant, i);
-                currentQuadrant = currentQuadrant.innerQuadrants().get(subQuadrant);
+                currentQuadrant = currentQuadrant.innerQuadrants()[subQuadrant];
             }
 
             addToQuadrant(currentQuadrant, i);
@@ -201,31 +199,31 @@ public class DistributedNBodyCalculator {
 
             Position bottomLeft = quadrant.bottomLeftCorner();
 
-            List<Quadrant> subQuadrants = new ArrayList<>();
-            subQuadrants.add(new Quadrant(-1, new Dimension(width, height),
+            final var subQuadrants = new Quadrant[4];
+            subQuadrants[0] = (new Quadrant(-1, new Dimension(width, height),
                     new Position(bottomLeft.horizontal() + width, bottomLeft.vertical())));
-            subQuadrants.add(new Quadrant(-1, new Dimension(width, height),
+            subQuadrants[1] = (new Quadrant(-1, new Dimension(width, height),
                     new Position(bottomLeft.horizontal() + width, bottomLeft.vertical() + height)));
-            subQuadrants.add(new Quadrant(-1, new Dimension(width, height),
+            subQuadrants[2] = (new Quadrant(-1, new Dimension(width, height),
                     new Position(bottomLeft.horizontal(), bottomLeft.vertical() + height)));
-            subQuadrants.add(new Quadrant(-1, new Dimension(width, height), bottomLeft));
+            subQuadrants[3] = (new Quadrant(-1, new Dimension(width, height), bottomLeft));
 
             quadrant.setInnerQuadrants(subQuadrants);
             quadrant.setInnerQuadrantCount(4);
 
             final var sq1 = locateSubQuadrant(quadrant, quadrant.index());
-            quadrant.innerQuadrants().get(sq1).setIndex(quadrant.index());
+            quadrant.innerQuadrants()[sq1].setIndex(quadrant.index());
 
             final var sq2 = locateSubQuadrant(quadrant, index);
             if (sq1 == sq2) {
 
-                addToQuadrant(quadrant.innerQuadrants().get(sq1), index);
+                addToQuadrant(quadrant.innerQuadrants()[sq1], index);
             } else {
-                quadrant.innerQuadrants().get(sq2).setIndex(index);
+                quadrant.innerQuadrants()[sq2].setIndex(index);
             }
         } else {
             int sq = locateSubQuadrant(quadrant, index);
-            addToQuadrant(quadrant.innerQuadrants().get(sq), index);
+            addToQuadrant(quadrant.innerQuadrants()[sq], index);
         }
     }
 

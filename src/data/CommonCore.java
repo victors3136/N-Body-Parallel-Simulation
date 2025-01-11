@@ -7,19 +7,18 @@ import java.io.PrintWriter;
 import java.util.List;
 
 public class CommonCore {
-    public static final double GravitationalConstant = 6.67300e-11;
+    public static final double GravitationalConstant = 1.0e7;
     public static final double maxWidth = 1.0e6;
     public static final double maxHeight = 1.0e6;
-    public static final double minInitialForce = -10;
-    public static final double maxInitialForce = 10;
-    public static final double maxBodyRadius = 10;
-    public static final double timeIncrement = 0.5;
+    public static final double boundingBoxTolerance = Math.min(maxWidth, maxHeight) / 100;
+    public static final double minInitialForce = 0;
+    public static final double maxInitialForce = 100;
+    public static final double maxBodyRadius = 100;
+    public static final double timeIncrement = 1;
     public static final double angle = 1.0;
-    public static final double defaultMass = 1.0;
-    public static final int bodyCount = 10;
-    public static final int iterationCount = 5000;
-    public static double maxMass = 100;
-    public static double maxInitialVelocity = 10;
+    public static final int bodyCount = 200;
+    public static final int iterationCount = 500;
+    public static double maxMass = 1.0e5;
 
     public enum Mode {
         DISTRIBUTED, THREADED;
@@ -34,14 +33,14 @@ public class CommonCore {
 
     public static void write(int iterationIndex, List<Point> points, Mode mode) {
         final var dir = mode.toDirName();
-        final var filename = String.format("src/visualise/csv/" + dir + "/positions_iter_%d.csv", iterationIndex);
+        final var filename = String.format("outputs/" + dir + "/csv/positions_iter_%d.csv", iterationIndex);
         try (final var fileWriter = new FileWriter(filename);
              final var bufferedWriter = new BufferedWriter(fileWriter);
              final var printWriter = new PrintWriter(bufferedWriter)) {
             printWriter.println("particle_id,x,y");
             for (var index = 0; index < CommonCore.bodyCount; index++) {
                 final var point = points.get(index);
-                printWriter.printf("%d,%.6f,%.6f%n",
+                printWriter.printf("%4d,%10.2f,%10.2f%n",
                         index,
                         point.position().horizontal(),
                         point.position().vertical());

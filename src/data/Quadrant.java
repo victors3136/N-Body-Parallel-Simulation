@@ -1,8 +1,6 @@
 package data;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
 public class Quadrant implements Serializable {
     private int index;
@@ -11,11 +9,16 @@ public class Quadrant implements Serializable {
     private Position bottomLeftCorner;
     private Position centerOfMass;
     private Dimension dimensions;
-    private List<Quadrant> innerQuadrants;
+    private Quadrant[] innerQuadrants;
     private Point innerPoint;
 
+    private static final int BOTTOM_LEFT = 0;
+    private static final int TOP_LEFT = 1;
+    private static final int TOP_RIGHT = 2;
+    private static final int BOTTOM_RIGHT = 3;
+
     public Quadrant() {
-        this(0, 0, new Mass(), new Position(), new Position(), new Dimension(), new ArrayList<>());
+        this(0, 0, new Mass(), new Position(), new Position(), new Dimension(), new Quadrant[4]);
     }
 
     public Quadrant(Dimension dimensions, Position bottomLeftCorner) {
@@ -25,7 +28,7 @@ public class Quadrant implements Serializable {
                 bottomLeftCorner,
                 new Position(),
                 dimensions,
-                new ArrayList<>());
+                new Quadrant[4]);
     }
 
     public Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
@@ -35,7 +38,7 @@ public class Quadrant implements Serializable {
                 bottomLeftCorner,
                 new Position(),
                 dimensions,
-                new ArrayList<>());
+                new Quadrant[4]);
     }
 
     public Quadrant(int index,
@@ -44,7 +47,7 @@ public class Quadrant implements Serializable {
                     Position bottomLeftCorner,
                     Position centerOfMass,
                     Dimension dimensions,
-                    List<Quadrant> innerQuadrants) {
+                    Quadrant[] innerQuadrants) {
         this.index = index;
         this.innerQuadrantCount = innerQuadrantCount;
         this.mass = mass;
@@ -79,7 +82,7 @@ public class Quadrant implements Serializable {
         return dimensions;
     }
 
-    public List<Quadrant> innerQuadrants() {
+    public Quadrant[] innerQuadrants() {
         return innerQuadrants;
     }
 
@@ -107,25 +110,38 @@ public class Quadrant implements Serializable {
         this.dimensions = dimensions;
     }
 
-    public void setInnerQuadrants(List<Quadrant> innerQuadrants) {
+    public void setInnerQuadrants(Quadrant[] innerQuadrants) {
         this.innerQuadrants = innerQuadrants;
     }
 
     public void insert(Point point) {
-        if (innerQuadrantCount == 0 && innerPoint == null) {
-            innerPoint = point;
-        } else if (innerQuadrantCount == 0) {
-            subdivide();
-            assert innerPoint != null;
-            final var toMove = innerPoint;
-            subquadrantContaining(toMove).insert(toMove);
-            subquadrantContaining(point).insert(point);
+        Quadrant current = this;
 
-        } else {
-            subquadrantContaining(point).insert(point);
+        while (true) {
+            if (current.innerQuadrantCount == 0 && current.innerPoint == null) {
+                current.innerPoint = point;
+                current.updateMass(point);
+                return;
+            } else if (current.innerQuadrantCount == 0) {
+                current.subdivide();
+                final var toMove = current.innerPoint;
+                current.innerPoint = null;
+                Quadrant targetQuadrantForExisting = current.subquadrantContaining(toMove);
+                targetQuadrantForExisting.innerPoint = toMove;
+                targetQuadrantForExisting.updateMass(toMove);
+            }
+
+            Quadrant targetQuadrantForNew = current.subquadrantContaining(point);
+            if (targetQuadrantForNew.innerPoint == null && targetQuadrantForNew.innerQuadrantCount == 0) {
+                targetQuadrantForNew.innerPoint = point;
+                targetQuadrantForNew.updateMass(point);
+                return;
+            }
+
+            current = targetQuadrantForNew;
         }
-        updateMass(point);
     }
+
 
     private void updateMass(Point point) {
         final var newMass = mass.value() + point.mass().value();
@@ -137,11 +153,6 @@ public class Quadrant implements Serializable {
     }
 
     private Quadrant subquadrantContaining(Point point) {
-        final var BOTTOM_LEFT = 0;
-        final var TOP_LEFT = 1;
-        final var TOP_RIGHT = 2;
-        final var BOTTOM_RIGHT = 3;
-
         final var anchorX = bottomLeftCorner.horizontal();
         final var anchorY = bottomLeftCorner.vertical();
         final var halfHeight = dimensions.vertical() / 2;
@@ -149,23 +160,16 @@ public class Quadrant implements Serializable {
         final var position = point.position();
         final var x = position.horizontal();
         final var y = position.vertical();
-        if ((x < anchorX) || (y < anchorY)) {
-            throw new RuntimeException("Underflow\nCoords : %s, %s, %s, %s, %s, %s"
-                    .formatted(x, y, anchorX, anchorY, halfWidth, halfHeight));
-        }
-        if ((x > (anchorX + 2 * halfWidth)) || (y > (anchorY + 2 * halfHeight))) {
-            throw new RuntimeException("Overflow\nCoords : %s, %s, %s, %s, %s, %s"
-                    .formatted(x, y, anchorX, anchorY, halfWidth, halfHeight));
-        }
-        if ((x < anchorX + halfWidth) && (y < anchorY + halfHeight)) {
-            //noinspection SequencedCollectionMethodCanBeUsed
-            return innerQuadrants.get(BOTTOM_LEFT);
-        } else if ((x <= anchorX + halfWidth) && (y <= anchorY + 2 * halfHeight)) {
-            return innerQuadrants.get(TOP_LEFT);
-        } else if ((x <= anchorX + 2 * halfWidth) && (y <= anchorY + 2 * halfHeight)) {
-            return innerQuadrants.get(TOP_RIGHT);
+        final var midX = anchorX + halfWidth;
+        final var midY = anchorY + halfHeight;
+        if ((x <= midX) && (y <= midY)) {
+            return innerQuadrants[BOTTOM_LEFT];
+        } else if ((x <= midX) && (y >= midY)) {
+            return innerQuadrants[TOP_LEFT];
+        } else if (y <= midY) {
+            return innerQuadrants[BOTTOM_RIGHT];
         } else {
-            return innerQuadrants.get(BOTTOM_RIGHT);
+            return innerQuadrants[TOP_RIGHT];
         }
     }
 
@@ -178,25 +182,25 @@ public class Quadrant implements Serializable {
             Quadrant bottomLeft = new Quadrant();
             bottomLeft.setBottomLeftCorner(new Position(anchorX, anchorY));
             bottomLeft.setDimensions(new Dimension(halfWidth, halfHeight));
-            innerQuadrants.add(bottomLeft);
+            innerQuadrants[BOTTOM_LEFT] = bottomLeft;
         }
         {
             Quadrant topLeft = new Quadrant();
             topLeft.setBottomLeftCorner(new Position(anchorX, anchorY + halfHeight));
             topLeft.setDimensions(new Dimension(halfWidth, halfHeight));
-            innerQuadrants.add(topLeft);
+            innerQuadrants[TOP_LEFT] = topLeft;
         }
         {
             Quadrant topRight = new Quadrant();
             topRight.setBottomLeftCorner(new Position(anchorX + halfWidth, anchorY + halfHeight));
             topRight.setDimensions(new Dimension(halfWidth, halfHeight));
-            innerQuadrants.add(topRight);
+            innerQuadrants[TOP_RIGHT] = topRight;
         }
         {
             Quadrant bottomRight = new Quadrant();
             bottomRight.setBottomLeftCorner(new Position(anchorX + halfWidth, anchorY));
             bottomRight.setDimensions(new Dimension(halfWidth, halfHeight));
-            innerQuadrants.add(bottomRight);
+            innerQuadrants[BOTTOM_RIGHT] = bottomRight;
         }
         innerQuadrantCount = 4;
     }
