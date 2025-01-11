@@ -84,14 +84,18 @@ public class Point implements Serializable {
         final var fy = 0;
 
         var vx = velocity.horizontal() + force.horizontal() / mass.value() * CommonCore.timeIncrement;
+        vx = Math.min(vx, CommonCore.maxVelocity);
+        vx = Math.max(vx, -1 * CommonCore.maxVelocity);
         var vy = velocity().vertical() + force.vertical() / mass.value() * CommonCore.timeIncrement;
+        vy = Math.min(vy, CommonCore.maxVelocity);
+        vy = Math.max(vy, -1 * CommonCore.maxVelocity);
 
         var px = position.horizontal() + velocity.horizontal() * CommonCore.timeIncrement;
         var py = position.vertical() + velocity.vertical() * CommonCore.timeIncrement;
-        if((px <= 0) || (px >= CommonCore.maxWidth)){
+        if ((px <= 0) || (px >= CommonCore.maxWidth)) {
             vx *= -1;
         }
-        if((py <= 0) || (py >= CommonCore.maxHeight)){
+        if ((py <= 0) || (py >= CommonCore.maxHeight)) {
             vy *= -1;
         }
         if (px == 0) {

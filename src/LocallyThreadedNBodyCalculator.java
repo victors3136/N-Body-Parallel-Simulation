@@ -40,8 +40,22 @@ public class LocallyThreadedNBodyCalculator {
             computeForces();
 
             points.forEach(Point::updatePosition);
-
+            ensureUniquePositions();
             writeOut(iteration);
+        }
+    }
+
+    private void ensureUniquePositions() {
+        for (var i = 0; i < points.size(); i++) {
+            for (var j = i + 1; j < points.size(); j++) {
+                if (points.get(i).position().equals(points.get(j).position())) {
+                    final var position = points.get(j).position();
+                    points.get(j).setPosition(new Position(
+                            position.horizontal() + 2 *RandomGenerator.nextDouble() - 1,
+                            position.vertical() + 2 *RandomGenerator.nextDouble() - 1
+                    ));
+                }
+            }
         }
     }
 
