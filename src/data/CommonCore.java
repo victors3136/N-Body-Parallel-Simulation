@@ -38,13 +38,14 @@ public class CommonCore {
         try (final var fileWriter = new FileWriter(filename);
              final var bufferedWriter = new BufferedWriter(fileWriter);
              final var printWriter = new PrintWriter(bufferedWriter)) {
-            printWriter.println("particle_id,x,y");
+            printWriter.println("particle_id,x,y,mass");
             for (var index = 0; index < CommonCore.bodyCount; index++) {
                 final var point = points.get(index);
-                printWriter.printf("%4d,%10.2f,%10.2f%n",
+                printWriter.printf("%4d,%10.2f,%10.2f,%10.2f%n",
                         index,
                         point.position().horizontal(),
-                        point.position().vertical());
+                        point.position().vertical(),
+                        point.mass().value());
             }
         } catch (IOException e) {
             System.err.println("Error writing to output file: " + e.getMessage());
