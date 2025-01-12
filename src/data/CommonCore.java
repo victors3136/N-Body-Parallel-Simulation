@@ -14,10 +14,10 @@ public class CommonCore {
     public static final double minInitialForce = 0;
     public static final double maxInitialForce = 100;
     public static final double maxBodyRadius = 100;
-    public static final double timeIncrement = 1;
+    public static final double timeIncrement = 2;
     public static final double angle = 1.0;
-    public static final int bodyCount = 200;
-    public static final int iterationCount = 200;
+    public static final int bodyCount = 8;
+    public static final int iterationCount = 500;
     public static double maxMass = 1.0e3;
     public static double maxVelocity = 1.0e4;
 

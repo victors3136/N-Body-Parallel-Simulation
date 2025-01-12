@@ -97,7 +97,7 @@ class NBodyVisualizer:
 
 if __name__ == "__main__":
     try:
-        visualizer = NBodyVisualizer('../../outputs/threaded/')
+        visualizer = NBodyVisualizer('../../outputs/distributed/')
         visualizer.animate(interval=20, save_animation=True)
     except Exception as e:
         print(f"\nCritical Error: {e}")

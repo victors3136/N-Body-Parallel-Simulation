@@ -1,6 +1,8 @@
 package data;
 
-public record Radius(double value) {
+import java.io.Serializable;
+
+public record Radius(double value) implements Serializable {
     public Radius() {
         this(0);
     }
