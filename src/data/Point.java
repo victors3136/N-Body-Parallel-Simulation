@@ -79,7 +79,7 @@ public class Point implements Serializable {
         return new Force(fx, fy);
     }
 
-    public void updatePosition() {
+    public synchronized void updatePosition() {
         final var fx = 0;
         final var fy = 0;
 

@@ -3,13 +3,12 @@ package data;
 import java.io.Serializable;
 
 public class Quadrant implements Serializable {
-    private int index;
     private int innerQuadrantCount;
     private Mass mass;
     private Position bottomLeftCorner;
     private Position centerOfMass;
     private Dimension dimensions;
-    private Quadrant[] innerQuadrants;
+    private final Quadrant[] innerQuadrants;
     private Point innerPoint;
 
     private static final int BOTTOM_LEFT = 0;
@@ -18,11 +17,11 @@ public class Quadrant implements Serializable {
     private static final int BOTTOM_RIGHT = 3;
 
     public Quadrant() {
-        this(0, 0, new Mass(), new Position(), new Position(), new Dimension(), new Quadrant[4]);
+        this(0, new Mass(), new Position(), new Position(), new Dimension(), new Quadrant[4]);
     }
 
     public Quadrant(Dimension dimensions, Position bottomLeftCorner) {
-        this(0,
+        this(
                 0,
                 new Mass(),
                 bottomLeftCorner,
@@ -31,24 +30,12 @@ public class Quadrant implements Serializable {
                 new Quadrant[4]);
     }
 
-    public Quadrant(int index, Dimension dimensions, Position bottomLeftCorner) {
-        this(index,
-                0,
-                new Mass(),
-                bottomLeftCorner,
-                new Position(),
-                dimensions,
-                new Quadrant[4]);
-    }
-
-    public Quadrant(int index,
-                    int innerQuadrantCount,
+    public Quadrant(int innerQuadrantCount,
                     Mass mass,
                     Position bottomLeftCorner,
                     Position centerOfMass,
                     Dimension dimensions,
                     Quadrant[] innerQuadrants) {
-        this.index = index;
         this.innerQuadrantCount = innerQuadrantCount;
         this.mass = mass;
         this.bottomLeftCorner = bottomLeftCorner;
@@ -58,40 +45,8 @@ public class Quadrant implements Serializable {
         this.innerPoint = null;
     }
 
-    public int index() {
-        return index;
-    }
-
-    public int innerQuadrantCount() {
-        return innerQuadrantCount;
-    }
-
     public Mass mass() {
         return mass;
-    }
-
-    public Position bottomLeftCorner() {
-        return bottomLeftCorner;
-    }
-
-    public Position centerOfMass() {
-        return centerOfMass;
-    }
-
-    public Dimension dimensions() {
-        return dimensions;
-    }
-
-    public Quadrant[] innerQuadrants() {
-        return innerQuadrants;
-    }
-
-    public void setIndex(int index) {
-        this.index = index;
-    }
-
-    public void setInnerQuadrantCount(int innerQuadrantCount) {
-        this.innerQuadrantCount = innerQuadrantCount;
     }
 
     public void setMass(Mass mass) {
@@ -102,19 +57,11 @@ public class Quadrant implements Serializable {
         this.bottomLeftCorner = bottomLeftCorner;
     }
 
-    public void setCenterOfMass(Position centerOfMass) {
-        this.centerOfMass = centerOfMass;
-    }
-
     public void setDimensions(Dimension dimensions) {
         this.dimensions = dimensions;
     }
 
-    public void setInnerQuadrants(Quadrant[] innerQuadrants) {
-        this.innerQuadrants = innerQuadrants;
-    }
-
-    public void insert(Point point) {
+    public synchronized void insert(Point point) {
         Quadrant current = this;
 
         while (true) {
@@ -143,7 +90,7 @@ public class Quadrant implements Serializable {
     }
 
 
-    private void updateMass(Point point) {
+    private synchronized void updateMass(Point point) {
         final var newMass = mass.value() + point.mass().value();
         final var cX = (centerOfMass.horizontal() * mass.value() + point.position().horizontal() * point.mass().value()) / newMass;
         final var cY = (centerOfMass.vertical() * mass.value() + point.position().vertical() * point.mass().value()) / newMass;
@@ -206,31 +153,33 @@ public class Quadrant implements Serializable {
     }
 
     public void addForceActingOn(Point point) {
-        var fx = point.force().horizontal();
-        var fy = point.force().vertical();
+        synchronized (point) {
+            var fx = point.force().horizontal();
+            var fy = point.force().vertical();
 
-        if (innerQuadrantCount == 0) {
-            if (innerPoint != null && !innerPoint.equals(point)) {
-                final var f = point.directForce(innerPoint);
+            if (innerQuadrantCount == 0) {
+                if (innerPoint != null && !innerPoint.equals(point)) {
+                    final var f = point.directForce(innerPoint);
+                    fx += f.horizontal();
+                    fy += f.vertical();
+                    point.setForce(new Force(fx, fy));
+                }
+                return;
+            }
+            final var size = dimensions.horizontal();
+            final var distance = point.position().distance(centerOfMass);
+            if (size / distance < CommonCore.angle) {
+
+                final var f = point.directForce(this.asPoint());
                 fx += f.horizontal();
                 fy += f.vertical();
                 point.setForce(new Force(fx, fy));
+                return;
             }
-            return;
-        }
-        final var size = dimensions.horizontal();
-        final var distance = point.position().distance(centerOfMass);
-        if (size / distance < CommonCore.angle) {
-
-            final var f = point.directForce(this.asPoint());
-            fx += f.horizontal();
-            fy += f.vertical();
-            point.setForce(new Force(fx, fy));
-            return;
-        }
-        for (final var innerQ : innerQuadrants) {
-            if (innerQ.innerQuadrantCount != 0 || innerQ.innerPoint != null) {
-                innerQ.addForceActingOn(point);
+            for (final var innerQ : innerQuadrants) {
+                if (innerQ.innerQuadrantCount != 0 || innerQ.innerPoint != null) {
+                    innerQ.addForceActingOn(point);
+                }
             }
         }
     }

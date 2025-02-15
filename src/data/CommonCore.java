@@ -16,8 +16,8 @@ public class CommonCore {
     public static final double maxBodyRadius = 100;
     public static final double timeIncrement = 2;
     public static final double angle = 1.0;
-    public static final int bodyCount = 8;
-    public static final int iterationCount = 500;
+    public static final int bodyCount = 64;
+    public static final int iterationCount = 2_000;
     public static double maxMass = 1.0e3;
     public static double maxVelocity = 1.0e4;
 
@@ -34,7 +34,7 @@ public class CommonCore {
 
     public static void write(int iterationIndex, List<Point> points, Mode mode) {
         final var dir = mode.toDirName();
-        final var filename = String.format("outputs/" + dir + "/csv/positions_iter_%d.csv", iterationIndex);
+        final var filename = String.format("outputs/%s/csv/positions_iter_%d.csv",dir, iterationIndex);
         try (final var fileWriter = new FileWriter(filename);
              final var bufferedWriter = new BufferedWriter(fileWriter);
              final var printWriter = new PrintWriter(bufferedWriter)) {
@@ -50,6 +50,23 @@ public class CommonCore {
         } catch (IOException e) {
             System.err.println("Error writing to output file: " + e.getMessage());
         }
+    }
+    public static void displayProgress(int iteration) {
+        final var barLength = 50;
+        double progress = (double) iteration / CommonCore.iterationCount;
+
+        int completed = (int) (progress * barLength);
+
+        StringBuilder bar = new StringBuilder("[");
+        for (var i = 0; i < barLength; i++) {
+            if (i < completed) {
+                bar.append("=");
+            } else {
+                bar.append(" ");
+            }
+        }
+        bar.append("]");
+        System.out.printf("%s %3.0f%%%n", bar, progress * 100);
     }
 }
 

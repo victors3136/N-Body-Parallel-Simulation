@@ -28,8 +28,9 @@ public class LocallyThreadedNBodyCalculator {
 
     public void run() {
         for (var iteration = 0; iteration < CommonCore.iterationCount; iteration++) {
-
-            System.out.println("Iteration " + iteration);
+            if(iteration % 50  == 0 || iteration == CommonCore.iterationCount - 1) {
+                CommonCore.displayProgress(iteration);
+            }
             rootQuadrant = new Quadrant(
                     new Dimension(CommonCore.maxWidth, CommonCore.maxHeight),
                     new Position()
@@ -51,8 +52,8 @@ public class LocallyThreadedNBodyCalculator {
                 if (points.get(i).position().equals(points.get(j).position())) {
                     final var position = points.get(j).position();
                     points.get(j).setPosition(new Position(
-                            position.horizontal() + 2 *RandomGenerator.nextDouble() - 1,
-                            position.vertical() + 2 *RandomGenerator.nextDouble() - 1
+                            position.horizontal() + 2 * RandomGenerator.nextDouble() - 1,
+                            position.vertical() + 2 * RandomGenerator.nextDouble() - 1
                     ));
                 }
             }
